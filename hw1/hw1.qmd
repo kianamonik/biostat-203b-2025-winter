@@ -35,7 +35,7 @@ sessionInfo()
 
 5. After this course, you can make this repository public and use it to demonstrate your skill sets on job market.
 
-**Solution** done
+**Solution:** done
 
 ## Q2. Data ethics training
 
@@ -55,7 +55,19 @@ Refer to the documentation <https://physionet.org/content/mimiciv/3.1/> for deta
 
   Use Bash commands to answer following questions.
 
+**Solution:** I downloaded the MIMIC IV v3.1 data and it's available under `~/mimic` folder as requested.
+
 2. Display the contents in the folders `hosp` and `icu` using Bash command `ls -l`. Why are these data files distributed as `.csv.gz` files instead of `.csv` (comma separated values) files? Read the page <https://mimic.mit.edu/docs/iv/> to understand what's in each folder.
+
+**Solution:** Here is the content of `hosp` folder
+```{bash}
+ls -l ~/mimic/hosp/
+```
+and content of the `icu` folder
+```{bash}
+ls -l ~/mimic/icu/
+```
+These data were distributed as `gz` file because `.csv.gz` files effectively compress big data files such as this and reduce storage space needed for them by decreasing the file size.
 
 3. Briefly describe what Bash commands `zcat`, `zless`, `zmore`, and `zgrep` do.
 
