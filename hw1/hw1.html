@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Kiana Mohammadinik and UID: 205928003">
+<meta name="author" content="Kiana Mohammadinik and UID 205928003">
 
 <title>Biostat 203B Homework 1</title>
 <style>
@@ -3114,7 +3114,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Author</div>
     <div class="quarto-title-meta-contents">
-             <p>Kiana Mohammadinik and UID: 205928003 </p>
+             <p>Kiana Mohammadinik and UID 205928003 </p>
           </div>
   </div>
     
@@ -3199,7 +3199,7 @@ drwxr-xr-x@ 11 kiananik  staff    352 Jan 21 06:28 icu</code></pre>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> <span class="at">-l</span> ~/mimic/hosp/</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>total 12347688
+<pre><code>total 12328176
 -rw-r--r--@ 1 kiananik  staff    19928140 Jun 24  2024 admissions.csv.gz
 -rw-r--r--@ 1 kiananik  staff      427554 Apr 12  2024 d_hcpcs.csv.gz
 -rw-r--r--@ 1 kiananik  staff      876360 Apr 12  2024 d_icd_diagnoses.csv.gz
@@ -3268,6 +3268,7 @@ drwxr-xr-x@ 11 kiananik  staff    352 Jan 21 06:28 icu</code></pre>
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> <span class="at">-nc</span> http://www.gutenberg.org/cache/epub/42671/pg42671.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Explain what <code>wget -nc</code> does. Do <strong>not</strong> put this text file <code>pg42671.txt</code> in Git. Complete the following loop to tabulate the number of times each of the four characters is mentioned using Linux commands.</p>
+<p><strong>Solution:</strong> <code>wget -nc</code> has two parts where <code>wget</code> is used to downlaod files from the web and <code>-nc</code> which stands for no-clobber prevents the code from overwriting an already existing file by not allowing it to download again if the file already exists.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> <span class="at">-nc</span> http://www.gutenberg.org/cache/epub/42671/pg42671.txt</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> char <span class="kw">in</span> Elizabeth Jane Lydia Darcy</span>
@@ -3286,6 +3287,7 @@ drwxr-xr-x@ 11 kiananik  staff    352 Jan 21 06:28 icu</code></pre>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&#39;hello, world&#39;</span> <span class="op">&gt;&gt;</span> test2.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<p><strong>Solution:</strong> the command with <code>&gt;</code> operator overwrites the file test1.txt with the text hello, world while the command with the <code>&gt;&gt;</code> appends the given text hello, world to the file test2.txt. With the <code>&gt;&gt;</code> operator, if the file test2.txt already exists, the text hello, world will be added to the end of the file instead of overwriting it.</p>
 <ol start="3" type="1">
 <li>Using your favorite text editor (e.g., <code>vi</code>), type the following and save the file as <code>middle.sh</code>:</li>
 </ol>
