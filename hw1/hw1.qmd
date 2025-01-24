@@ -199,6 +199,7 @@ Using `chmod` to make the file executable by the owner, and run
 
 Explain the output. Explain the meaning of `"$1"`, `"$2"`, and `"$3"` in this shell script. Why do we need the first line of the shell script?
 
+**Solution:** `"$1"` refers to the first argument  which is the filename. `"$2"` refers to the second argument which is the number of lines from the start. `"$3"` refers to the third argument which is the number of lines to extract from the end of the previously selected lines. This resulted in the last 5 lines from the first 20 lines in the Pride and Prejudice text to be extracted. We need the first line in the shell script becuase it specifies which interpreter to use when executing the script and without it the script might not run properly.
 
 
 ## Q5. More fun with Linux
