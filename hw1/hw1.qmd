@@ -84,7 +84,7 @@ These data were distributed as `gz` file because `.csv.gz` files effectively com
 4.  (Looping in Bash) What's the output of the following bash script?
 
 ```{bash}
-#| eval: false
+#| eval: True
 for datafile in ~/mimic/hosp/{a,l,pa}*.gz
 do
   ls -l $datafile
@@ -257,7 +257,7 @@ The difference between the two runtimes shows that even though compressed files 
 1.  You and your friend just have finished reading *Pride and Prejudice* by Jane Austen. Among the four main characters in the book, Elizabeth, Jane, Lydia, and Darcy, your friend thinks that Darcy was the most mentioned. You, however, are certain it was Elizabeth. Obtain the full text of the novel from <http://www.gutenberg.org/cache/epub/42671/pg42671.txt> and save to your local folder.
 
 ```{bash}
-#| eval: false
+#| eval: True
 wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 ```
 
@@ -266,7 +266,7 @@ Explain what `wget -nc` does. Do **not** put this text file `pg42671.txt` in Git
 **Solution:** `wget -nc` has two parts where `wget` is used to downlaod files from the web and `-nc` which stands for no-clobber prevents the code from overwriting an already existing file by not allowing it to download again if the file already exists.
 
 ```{bash}
-#| eval: false
+#| eval: True
 wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 for char in Elizabeth Jane Lydia Darcy
 do
@@ -278,14 +278,14 @@ done
 2.  What's the difference between the following two commands?
 
 ```{bash}
-#| eval: false
+#| eval: True
 echo 'hello, world' > test1.txt
 ```
 
 and
 
 ```{bash}
-#| eval: false
+#| eval: True
 echo 'hello, world' >> test2.txt
 ```
 
@@ -303,7 +303,7 @@ head -n "$2" "$1" | tail -n "$3"
 Using `chmod` to make the file executable by the owner, and run
 
 ```{bash}
-#| eval: false
+#| eval: True
 ./middle.sh pg42671.txt 20 5
 ```
 
