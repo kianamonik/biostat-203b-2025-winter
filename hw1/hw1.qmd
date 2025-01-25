@@ -94,7 +94,7 @@ done
 
 Display the number of lines in each data file using a similar loop. (Hint: combine linux commands `zcat <` and `wc -l`.)
 
-**Solution:** Displaying the number of lines in each data file
+Displaying the number of lines in each data file
 ```{bash}
 for datafile in ~/mimic/hosp/{a,l,pa}*.gz
 do
@@ -152,9 +152,105 @@ wc -l
 
 6.  What are the possible values taken by each of the variable `admission_type`, `admission_location`, `insurance`, and `ethnicity`? Also report the count for each unique value of these variables in decreasing order. (Hint: combine Linux commands `zcat`, `head`/`tail`, `awk`, `uniq -c`, `wc`, `sort`, and so on; skip the header line.)
 
-7.  The `icusays.csv.gz` file contains all the ICU stays during the study period. How many ICU stays, identified by `stay_id`, are in this data file? How many unique patients, identified by `subject_id`, are in this data file?
+**Solution:**
+
+Figuring out the column number for each variable
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz |
+head -n 1 |
+tr ',' '\n' |
+nl
+```
+The count for each unique value of `admission_type` in decreasing order
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz |
+tail -n +2 |
+awk -F, '{print $6}' |
+sort |
+uniq -c |
+sort -nr
+```
+The count for each unique value of `admission_location` in decreasing order
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz |
+tail -n +2 |
+awk -F, '{print $8}' |
+sort |
+uniq -c |
+sort -nr
+```
+The count for each unique value of `insurance` in decreasing order
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz |
+tail -n +2 |
+awk -F, '{print $10}' |
+sort |
+uniq -c |
+sort -nr
+```
+The count for each unique value of `ethnicity` in decreasing order
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz |
+tail -n +2 |
+awk -F, '{print $13}' |
+sort |
+uniq -c |
+sort -nr
+```
+
+7.  The `icustays.csv.gz` file contains all the ICU stays during the study period. How many ICU stays, identified by `stay_id`, are in this data file? How many unique patients, identified by `subject_id`, are in this data file?
+
+**Solution:**
+Figuring out the column number for `stay_id` and `subject_id`
+```{bash}
+zcat < ~/mimic/icu/icustays.csv.gz |
+head -n 1 |
+tr ',' '\n' |
+nl
+```
+The number of ICU stays identified by `stay_id`
+```{bash}
+zcat < ~/mimic/icu/icustays.csv.gz |
+tail -n +2 |
+awk -F, '{print $3}' |
+sort |
+uniq |
+wc -l
+```
+
+The number of unique patients identified by `subject_id`
+```{bash}
+zcat < ~/mimic/icu/icustays.csv.gz |
+tail -n +2 |
+awk -F, '{print $1}' |
+sort |
+uniq |
+wc -l
+```
 
 8.  *To compress, or not to compress. That's the question.* Let's focus on the big data file `labevents.csv.gz`. Compare compressed gz file size to the uncompressed file size. Compare the run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` versus `wc -l labevents.csv`. Discuss the trade off between storage and speed for big data files. (Hint: `gzip -dk < FILENAME.gz > ./FILENAME`. Remember to delete the large `labevents.csv` file after the exercise.)
+
+**Solution:**
+```{bash}
+ls -lh ~/mimic/hosp/labevents.csv.gz
+gzip -dk ~/mimic/hosp/labevents.csv.gz
+ls -lh ~/mimic/hosp/labevents.csv
+```
+The runtime for `zcat < ~/mimic/labevents.csv.gz | wc -l` is
+```{bash}
+time zcat < ~/mimic/hosp/labevents.csv.gz | wc -l
+```
+The runtime for `wc -l labevents.csv`
+```{bash}
+time wc -l ~/mimic/hosp/labevents.csv
+```
+Deleting the `labevents.csv` file
+```{bash}
+rm ~/mimic/hosp/labevents.csv
+```
+The difference between the two runtimes shows that even though compressed files save significant storage space, they also require decompression for usage which can be slower than a regular file that doesn't need decompression.
+
+
 
 ## Q4. Who's popular in Price and Prejudice
 
@@ -213,14 +309,80 @@ Using `chmod` to make the file executable by the owner, and run
 
 Explain the output. Explain the meaning of `"$1"`, `"$2"`, and `"$3"` in this shell script. Why do we need the first line of the shell script?
 
-**Solution:** `"$1"` refers to the first argument  which is the filename. `"$2"` refers to the second argument which is the number of lines from the start. `"$3"` refers to the third argument which is the number of lines to extract from the end of the previously selected lines. This resulted in the last 5 lines from the first 20 lines in the Pride and Prejudice text to be extracted. We need the first line in the shell script becuase it specifies which interpreter to use when executing the script and without it the script might not run properly.
+**Solution:** The output shows the date May 9, 2013, the format of the ebook, and it also shows that the language of ht ebook is English. `"$1"` refers to the first argument  which is the filename. `"$2"` refers to the second argument which is the number of lines from the start. `"$3"` refers to the third argument which is the number of lines to extract from the end of the previously selected lines. This resulted in the last 5 lines from the first 20 lines in the Pride and Prejudice text to be extracted. We need the first line in the shell script becuase it specifies which interpreter to use when executing the script and without it the script might not run properly.
 
 
 ## Q5. More fun with Linux
 
 Try following commands in Bash and interpret the results: `cal`, `cal 2025`, `cal 9 1752` (anything unusual?), `date`, `hostname`, `arch`, `uname -a`, `uptime`, `who am i`, `who`, `w`, `id`, `last | head`, `echo {con,pre}{sent,fer}{s,ed}`, `time sleep 5`, `history | tail`.
 
-**Solution:** Done. Also, the unusual occurance in the ouput for `cal 9 1752` is that the calender skips sept 3-13 in 1752. Upon further research, I found the reason for this is that 1752 was the year that in the British Empire adopted the Gregorian calendar and 11 days were dropped.
+**Solution:** 
+```{bash}
+cal
+```
+
+```{bash}
+cal 2025
+```
+
+```{bash}
+cal 9 1752
+```
+The unusual occurance in the ouput for `cal 9 1752` is that the calender skips sept 3-13 in 1752. Upon further research, I found the reason for this is that 1752 was the year that in the British Empire adopted the Gregorian calendar and 11 days were dropped.
+```{bash}
+date
+```
+
+```{bash}
+hostname
+```
+
+```{bash}
+arch
+```
+
+```{bash}
+uname -a
+```
+
+```{bash}
+uptime
+```
+
+```{bash}
+who am i
+```
+
+```{bash}
+who
+```
+
+```{bash}
+w
+```
+
+```{bash}
+id
+```
+
+```{bash}
+last | head
+```
+
+```{bash}
+echo {con,pre}{sent,fer}{s,ed}
+```
+
+```{bash}
+time sleep 5
+```
+
+```{bash}
+history | tail
+```
+
+
+Done. 
 
 ## Q6. Book
 
