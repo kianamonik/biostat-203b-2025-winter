@@ -14,7 +14,6 @@ format:
     link-external-icon: true
     link-external-newwindow: true
 ---
-
 Display machine information for reproducibility:
 
 ```{r}
@@ -168,15 +167,17 @@ Try to ingest `labevents.csv.gz` using `read_csv`. What happens? If it takes mor
 
 **Solution:**
 
-```{r}
-system.time(
-  lab_data <- read_csv("~/mimic/hosp/labevents.csv.gz")
-)
+```{r} 
+#| eval: false
+library(readr)
+system.time(lab_data <- read_csv("~/mimic/hosp/labevents.csv.gz"))
 
 pryr::object_size(lab_data)
 
 str(lab_data)
 ```
+Attempting to ingest labevents.csv.gz using read_csv() multiple times resulted in a vector memory exhausted (limit reached) error. Despite having 16GB of RAM, R was unable to allocate enough memory to load the full dataset. More memory-efficient alternatives like fread() (data.table) or chunked reading are may be more appropriate in this context.
+
 
 ### Q2.2 Ingest selected columns of `labevents.csv.gz` by `read_csv`
 
