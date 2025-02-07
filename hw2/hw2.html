@@ -3313,8 +3313,8 @@ Attaching package: &#39;R.utils&#39;</code></pre>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>memuse<span class="sc">::</span><span class="fu">Sys.meminfo</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Totalram:   16.000 GiB 
-Freeram:   114.688 MiB </code></pre>
+<pre><code>Totalram:  16.000 GiB 
+Freeram:    1.754 GiB </code></pre>
 </div>
 </div>
 <p>In this exercise, we explore various tools for ingesting the <a href="https://physionet.org/content/mimiciv/3.1/">MIMIC-IV</a> data introduced in <a href="https://ucla-biostat-203b.github.io/2025winter/hw/hw1/hw1.html">homework 1</a>.</p>
@@ -3374,7 +3374,7 @@ Freeram:   114.688 MiB </code></pre>
 <span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(adm_base <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;~/mimic/hosp/admissions.csv.gz&quot;</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   user  system elapsed 
-  5.594   0.080   5.711 </code></pre>
+  5.510   0.051   5.594 </code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>pryr<span class="sc">::</span><span class="fu">object_size</span>(adm_base)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -3420,7 +3420,7 @@ dttm (5): admittime, dischtime, deathtime, edregtime, edouttime
 </div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   user  system elapsed 
-  0.999   0.120   0.595 </code></pre>
+  0.995   0.111   0.581 </code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>pryr<span class="sc">::</span><span class="fu">object_size</span>(adm_tidy)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -3475,7 +3475,7 @@ Default Parsed Data Type: <code>read_csv</code> outputs a tibble, which does not
 <span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(adm_dt <span class="ot">&lt;-</span> data.table<span class="sc">::</span><span class="fu">fread</span>(<span class="st">&quot;~/mimic/hosp/admissions.csv.gz&quot;</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   user  system elapsed 
-  0.452   0.034   0.500 </code></pre>
+  0.458   0.032   0.504 </code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb59"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>pryr<span class="sc">::</span><span class="fu">object_size</span>(adm_dt)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -3514,8 +3514,8 @@ Default Parsed Data Type: similar to <code>read_csv</code>, <code>fread</code> a
 <div class="cell">
 <div class="sourceCode cell-code" id="cb63"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Define column types</span></span>
 <span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a>col_types_spec <span class="ot">&lt;-</span> <span class="fu">cols</span>(</span>
-<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">subject_id =</span> <span class="fu">col_integer</span>(),</span>
-<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">hadm_id =</span> <span class="fu">col_integer</span>(),</span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">subject_id =</span> <span class="fu">col_double</span>(),</span>
+<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">hadm_id =</span> <span class="fu">col_double</span>(),</span>
 <span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">admittime =</span> <span class="fu">col_datetime</span>(<span class="at">format =</span> <span class="st">&quot;&quot;</span>),</span>
 <span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">dischtime =</span> <span class="fu">col_datetime</span>(<span class="at">format =</span> <span class="st">&quot;&quot;</span>),</span>
 <span id="cb63-7"><a href="#cb63-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">deathtime =</span> <span class="fu">col_datetime</span>(<span class="at">format =</span> <span class="st">&quot;&quot;</span>),</span>
@@ -3529,24 +3529,24 @@ Default Parsed Data Type: similar to <code>read_csv</code>, <code>fread</code> a
 <span id="cb63-15"><a href="#cb63-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">race =</span> <span class="fu">col_character</span>(),</span>
 <span id="cb63-16"><a href="#cb63-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">edregtime =</span> <span class="fu">col_datetime</span>(<span class="at">format =</span> <span class="st">&quot;&quot;</span>),</span>
 <span id="cb63-17"><a href="#cb63-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">edouttime =</span> <span class="fu">col_datetime</span>(<span class="at">format =</span> <span class="st">&quot;&quot;</span>),</span>
-<span id="cb63-18"><a href="#cb63-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">hospital_expire_flag =</span> <span class="fu">col_integer</span>()</span>
+<span id="cb63-18"><a href="#cb63-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">hospital_expire_flag =</span> <span class="fu">col_double</span>()</span>
 <span id="cb63-19"><a href="#cb63-19" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb63-20"><a href="#cb63-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb63-21"><a href="#cb63-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Read with specified column types</span></span>
 <span id="cb63-22"><a href="#cb63-22" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(adm_tidy2 <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="st">&quot;~/mimic/hosp/admissions.csv.gz&quot;</span>, <span class="at">col_types =</span> col_types_spec))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   user  system elapsed 
-  0.920   0.111   0.507 </code></pre>
+  0.934   0.093   0.496 </code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb65"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a>pryr<span class="sc">::</span><span class="fu">object_size</span>(adm_tidy2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>63.47 MB</code></pre>
+<pre><code>70.02 MB</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb67"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(adm_tidy2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>spc_tbl_ [546,028 × 16] (S3: spec_tbl_df/tbl_df/tbl/data.frame)
- $ subject_id          : int [1:546028] 10000032 10000032 10000032 10000032 10000068 10000084 10000084 10000108 10000117 10000117 ...
- $ hadm_id             : int [1:546028] 22595853 22841357 25742920 29079034 25022803 23052089 29888819 27250926 22927623 27988844 ...
+ $ subject_id          : num [1:546028] 1e+07 1e+07 1e+07 1e+07 1e+07 ...
+ $ hadm_id             : num [1:546028] 22595853 22841357 25742920 29079034 25022803 ...
  $ admittime           : POSIXct[1:546028], format: &quot;2180-05-06 22:23:00&quot; &quot;2180-06-26 18:27:00&quot; ...
  $ dischtime           : POSIXct[1:546028], format: &quot;2180-05-07 17:15:00&quot; &quot;2180-06-27 18:49:00&quot; ...
  $ deathtime           : POSIXct[1:546028], format: NA NA ...
@@ -3560,11 +3560,11 @@ Default Parsed Data Type: similar to <code>read_csv</code>, <code>fread</code> a
  $ race                : chr [1:546028] &quot;WHITE&quot; &quot;WHITE&quot; &quot;WHITE&quot; &quot;WHITE&quot; ...
  $ edregtime           : POSIXct[1:546028], format: &quot;2180-05-06 19:17:00&quot; &quot;2180-06-26 15:54:00&quot; ...
  $ edouttime           : POSIXct[1:546028], format: &quot;2180-05-06 23:30:00&quot; &quot;2180-06-26 21:31:00&quot; ...
- $ hospital_expire_flag: int [1:546028] 0 0 0 0 0 0 0 0 0 0 ...
+ $ hospital_expire_flag: num [1:546028] 0 0 0 0 0 0 0 0 0 0 ...
  - attr(*, &quot;spec&quot;)=
   .. cols(
-  ..   subject_id = col_integer(),
-  ..   hadm_id = col_integer(),
+  ..   subject_id = col_double(),
+  ..   hadm_id = col_double(),
   ..   admittime = col_datetime(format = &quot;&quot;),
   ..   dischtime = col_datetime(format = &quot;&quot;),
   ..   deathtime = col_datetime(format = &quot;&quot;),
@@ -3578,12 +3578,12 @@ Default Parsed Data Type: similar to <code>read_csv</code>, <code>fread</code> a
   ..   race = col_character(),
   ..   edregtime = col_datetime(format = &quot;&quot;),
   ..   edouttime = col_datetime(format = &quot;&quot;),
-  ..   hospital_expire_flag = col_integer()
+  ..   hospital_expire_flag = col_double()
   .. )
  - attr(*, &quot;problems&quot;)=&lt;externalptr&gt; </code></pre>
 </div>
 </div>
-<p>The run time decreases by 0.116 seconds and the memory usage decreases by 6.55 MB.</p>
+<p>The run time decreases by 0.068 seconds and the memory usage remains unchanged.</p>
 </section>
 </section>
 <section id="q2.-ingest-big-data-files" class="level2">
@@ -3620,6 +3620,16 @@ Default Parsed Data Type: similar to <code>read_csv</code>, <code>fread</code> a
 </p><p><img role="img" src="./readr_logo.png" width="20%"></p>
 <p></p>
 <p>Try to ingest <code>labevents.csv.gz</code> using <code>read_csv</code>. What happens? If it takes more than 3 minutes on your computer, then abort the program and report your findings.</p>
+<p><strong>Solution:</strong></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb73"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(lab_data <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;~/mimic/hosp/labevents.csv.gz&quot;</span>))</span>
+<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-4"><a href="#cb73-4" aria-hidden="true" tabindex="-1"></a>pryr<span class="sc">::</span><span class="fu">object_size</span>(lab_data)</span>
+<span id="cb73-5"><a href="#cb73-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-6"><a href="#cb73-6" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(lab_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Attempting to ingest labevents.csv.gz using read_csv() multiple times resulted in a vector memory exhausted (limit reached) error. Despite having 16GB of RAM, R was unable to allocate enough memory to load the full dataset. More memory-efficient alternatives like fread() (data.table) or chunked reading are may be more appropriate in this context.</p>
 </section>
 <section id="q2.2-ingest-selected-columns-of-labevents.csv.gz-by-read_csv" class="level3">
 <h3 class="anchored" data-anchor-id="q2.2-ingest-selected-columns-of-labevents.csv.gz-by-read_csv">Q2.2 Ingest selected columns of <code>labevents.csv.gz</code> by <code>read_csv</code></h3>
@@ -3664,7 +3674,7 @@ Default Parsed Data Type: similar to <code>read_csv</code>, <code>fread</code> a
 <h2 class="anchored" data-anchor-id="q3.-ingest-and-filter-chartevents.csv.gz">Q3. Ingest and filter <code>chartevents.csv.gz</code></h2>
 <p><a href="https://mimic.mit.edu/docs/iv/modules/icu/chartevents/"><code>chartevents.csv.gz</code></a> contains all the charted data available for a patient. During their ICU stay, the primary repository of a patient’s information is their electronic chart. The <code>itemid</code> variable indicates a single measurement type in the database. The <code>value</code> variable is the value measured for <code>itemid</code>. The first 10 lines of <code>chartevents.csv.gz</code> are</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb73"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="fu">zcat</span> <span class="op">&lt;</span> ~/mimic/icu/chartevents.csv.gz <span class="kw">|</span> <span class="fu">head</span> <span class="at">-10</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb74"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="fu">zcat</span> <span class="op">&lt;</span> ~/mimic/icu/chartevents.csv.gz <span class="kw">|</span> <span class="fu">head</span> <span class="at">-10</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>subject_id,hadm_id,stay_id,caregiver_id,charttime,storetime,itemid,value,valuenum,valueuom,warning
 10000032,29079034,39553978,18704,2180-07-23 12:36:00,2180-07-23 14:45:00,226512,39.4,39.4,kg,0
@@ -3680,11 +3690,11 @@ Default Parsed Data Type: similar to <code>read_csv</code>, <code>fread</code> a
 </div>
 <p>How many rows? 433 millions.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb75"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="fu">zcat</span> <span class="op">&lt;</span> ~/mimic/icu/chartevents.csv.gz <span class="kw">|</span> <span class="fu">tail</span> <span class="at">-n</span> +2 <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb76"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="fu">zcat</span> <span class="op">&lt;</span> ~/mimic/icu/chartevents.csv.gz <span class="kw">|</span> <span class="fu">tail</span> <span class="at">-n</span> +2 <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p><a href="https://mimic.mit.edu/docs/iv/modules/icu/d_items/"><code>d_items.csv.gz</code></a> is the dictionary for the <code>itemid</code> in <code>chartevents.csv.gz</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb76"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="fu">zcat</span> <span class="op">&lt;</span> ~/mimic/icu/d_items.csv.gz <span class="kw">|</span> <span class="fu">head</span> <span class="at">-10</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb77"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="fu">zcat</span> <span class="op">&lt;</span> ~/mimic/icu/d_items.csv.gz <span class="kw">|</span> <span class="fu">head</span> <span class="at">-10</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>itemid,label,abbreviation,linksto,category,unitname,param_type,lownormalvalue,highnormalvalue
 220001,Problem List,Problem List,chartevents,General,,Text,,
