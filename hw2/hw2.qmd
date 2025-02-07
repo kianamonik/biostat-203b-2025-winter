@@ -30,6 +30,7 @@ library(memuse)
 library(pryr)
 library(R.utils)
 library(tidyverse)
+library(readr)
 ```
 
 Display memory information of your computer
@@ -126,7 +127,8 @@ col_types_spec <- cols(
 )
 
 # Read with specified column types
-system.time(adm_tidy2 <- readr::read_csv("~/mimic/hosp/admissions.csv.gz", col_types = col_types_spec))
+system.time(adm_tidy2 <- readr::read_csv("~/mimic/hosp/admissions.csv.gz",
+                                         col_types = col_types_spec))
 
 pryr::object_size(adm_tidy2)
 
@@ -169,7 +171,6 @@ Try to ingest `labevents.csv.gz` using `read_csv`. What happens? If it takes mor
 
 ```{r} 
 #| eval: false
-library(readr)
 system.time(lab_data <- read_csv("~/mimic/hosp/labevents.csv.gz"))
 
 pryr::object_size(lab_data)
@@ -182,6 +183,23 @@ Attempting to ingest labevents.csv.gz using read_csv() multiple times resulted i
 ### Q2.2 Ingest selected columns of `labevents.csv.gz` by `read_csv`
 
 Try to ingest only columns `subject_id`, `itemid`, `charttime`, and `valuenum` in `labevents.csv.gz` using `read_csv`. Does this solve the ingestion issue? (Hint: `col_select` argument in `read_csv`.)
+
+**Solution:**
+```{r}
+#| eval: false
+system.time(
+  lab_data <- read_csv("~/mimic/hosp/labevents.csv.gz", 
+                       col_select = c("subject_id", "itemid", "charttime",
+                                      "valuenum"))
+)
+
+pryr::object_size(lab_data)
+
+str(lab_data)
+```
+The dataset was successfully ingested after selecting only the four columns (subject_id, itemid, charttime, valuenum). The ingestion process took ~3.3 minutes (197.6 seconds) to complete and the total memory usage of the resulting dataset is ~5.07 GB. The reduced column selection helped avoid memory exhaustion encountered in Q2.1 which confirms that limiting column selection significantly reduces memory usage, making it feasible to load large datasets.
+
+
 
 ### Q2.3 Ingest a subset of `labevents.csv.gz`
 
