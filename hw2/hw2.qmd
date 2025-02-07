@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 2"
 subtitle: Due Feb 7, 2025 @ 11:59PM
-author: "Kiana Mohammadinik and UID"
+author: "Kiana Mohammadinik and 205928003"
 format:
   html:
     theme: cosmo
@@ -58,6 +58,39 @@ ls -l ~/mimic/icu/
 There are quite a few utilities in R for reading plain text data files. Let us test the speed of reading a moderate sized compressed csv file, `admissions.csv.gz`, by three functions: `read.csv` in base R, `read_csv` in tidyverse, and `fread` in the data.table package.
 
 Which function is fastest? Is there difference in the (default) parsed data types? How much memory does each resultant dataframe or tibble use? (Hint: `system.time` measures run times; `pryr::object_size` measures memory usage; all these readers can take gz file as input without explicit decompression.)
+
+**Solution:**  
+```{r}
+# Base R: read.csv
+system.time(adm_base <- read.csv("~/mimic/hosp/admissions.csv.gz"))
+pryr::object_size(adm_base)
+str(adm_base)  
+```
+Time: 2.469 seconds\
+Memory Usage: 200.1 MB\
+Default Parsed Data Type: `read.csv` defaults to character vectors for text columns and uses heuristics to guess numeric and integer types.
+
+```{r}
+# Tidyverse: read_csv
+system.time(adm_tidy <- readr::read_csv("~/mimic/hosp/admissions.csv.gz"))
+pryr::object_size(adm_tidy)
+str(adm_tidy)  
+```
+Time: 0.672 seconds\
+Memory Usage: 70.02 MB\
+Default Parsed Data Type: `read_csv` outputs a tibble, which does not automatically convert character columns to factors. 
+
+```{r}
+# data.table: fread
+system.time(adm_dt <- data.table::fread("~/mimic/hosp/admissions.csv.gz"))
+pryr::object_size(adm_dt)
+str(adm_dt)  
+```
+Time: 0.541 seconds\
+Memory Usage: 63.47 MB\
+Default Parsed Data Type: similar to `read_csv`, `fread` also has effecient auto-detection.
+
+**Conclusion:** `fread` is the fastest and most memory-efficient. `fread` and `read_csv` are better at detecting data types automatically than `read.csv`.
 
 ### Q1.2 User-supplied data types
 
