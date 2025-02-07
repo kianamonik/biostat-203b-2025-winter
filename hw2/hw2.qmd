@@ -59,13 +59,16 @@ There are quite a few utilities in R for reading plain text data files. Let us t
 
 Which function is fastest? Is there difference in the (default) parsed data types? How much memory does each resultant dataframe or tibble use? (Hint: `system.time` measures run times; `pryr::object_size` measures memory usage; all these readers can take gz file as input without explicit decompression.)
 
-**Solution:**  
+**Solution:**
+
 ```{r}
 # Base R: read.csv
 system.time(adm_base <- read.csv("~/mimic/hosp/admissions.csv.gz"))
+
 pryr::object_size(adm_base)
 str(adm_base)  
 ```
+
 Time: 2.469 seconds\
 Memory Usage: 200.1 MB\
 Default Parsed Data Type: `read.csv` defaults to character vectors for text columns and uses heuristics to guess numeric and integer types.
@@ -73,19 +76,25 @@ Default Parsed Data Type: `read.csv` defaults to character vectors for text colu
 ```{r}
 # Tidyverse: read_csv
 system.time(adm_tidy <- readr::read_csv("~/mimic/hosp/admissions.csv.gz"))
+
 pryr::object_size(adm_tidy)
+
 str(adm_tidy)  
 ```
+
 Time: 0.672 seconds\
 Memory Usage: 70.02 MB\
-Default Parsed Data Type: `read_csv` outputs a tibble, which does not automatically convert character columns to factors. 
+Default Parsed Data Type: `read_csv` outputs a tibble, which does not automatically convert character columns to factors.
 
 ```{r}
 # data.table: fread
 system.time(adm_dt <- data.table::fread("~/mimic/hosp/admissions.csv.gz"))
+
 pryr::object_size(adm_dt)
+
 str(adm_dt)  
 ```
+
 Time: 0.541 seconds\
 Memory Usage: 63.47 MB\
 Default Parsed Data Type: similar to `read_csv`, `fread` also has effecient auto-detection.
@@ -99,8 +108,8 @@ Re-ingest `admissions.csv.gz` by indicating appropriate column data types in `re
 ```{r}
 # Define column types
 col_types_spec <- cols(
-  subject_id = col_integer(),
-  hadm_id = col_integer(),
+  subject_id = col_double(),
+  hadm_id = col_double(),
   admittime = col_datetime(format = ""),
   dischtime = col_datetime(format = ""),
   deathtime = col_datetime(format = ""),
@@ -114,15 +123,18 @@ col_types_spec <- cols(
   race = col_character(),
   edregtime = col_datetime(format = ""),
   edouttime = col_datetime(format = ""),
-  hospital_expire_flag = col_integer()
+  hospital_expire_flag = col_double()
 )
 
 # Read with specified column types
 system.time(adm_tidy2 <- readr::read_csv("~/mimic/hosp/admissions.csv.gz", col_types = col_types_spec))
+
 pryr::object_size(adm_tidy2)
+
 str(adm_tidy2)
 ```
-The run time decreases by 0.116 seconds and the memory usage decreases by 6.55 MB.
+
+The run time decreases by 0.068 seconds and the memory usage remains unchanged.
 
 ## Q2. Ingest big data files
 
@@ -153,6 +165,18 @@ zcat < ~/mimic/hosp/labevents.csv.gz | head -10
 </p>
 
 Try to ingest `labevents.csv.gz` using `read_csv`. What happens? If it takes more than 3 minutes on your computer, then abort the program and report your findings.
+
+**Solution:**
+
+```{r}
+system.time(
+  lab_data <- read_csv("~/mimic/hosp/labevents.csv.gz")
+)
+
+pryr::object_size(lab_data)
+
+str(lab_data)
+```
 
 ### Q2.2 Ingest selected columns of `labevents.csv.gz` by `read_csv`
 
