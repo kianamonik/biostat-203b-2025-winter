@@ -3,7 +3,7 @@ title: "Biostat 203B Homework 2"
 subtitle: Due Feb 7, 2025 @ 11:59PM
 author: "Kiana Mohammadinik and 205928003"
 format:
-  pdf:
+  html:
     theme: cosmo
     embed-resources: true
     number-sections: false
@@ -13,6 +13,10 @@ format:
     code-fold: false
     link-external-icon: true
     link-external-newwindow: true
+  pdf:
+    number-sections: true
+    toc: true
+    toc-depth: 3
 ---
 Display machine information for reproducibility:
 
@@ -253,7 +257,7 @@ str(lab_data_sorted)
 ```
 It took 5.094 seconds for `read_csv` to ingest `labevents_filtered.csv.gz`.
 
-The number of rows (excluding the header) is 32679896.
+The number of rows (excluding the header) is
 ```{bash}
 gzcat labevents_filtered.csv.gz | tail -n +2 | wc -l
 ```
@@ -276,7 +280,7 @@ Write a few sentences to explain what is Apache Arrow. Imagine you want to expla
 **Solution:** 
 ```{bash}
 #| eval: false
-gzip -d -c labevents_filtered.csv.gz > labevents_filtered.csv
+gunzip -c labevents_filtered.csv.gz > labevents_filtered.csv
 ```
 
 ```{r}
