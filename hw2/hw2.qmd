@@ -277,6 +277,36 @@ Then use [`arrow::open_dataset`](https://arrow.apache.org/docs/r/reference/open_
 
 Write a few sentences to explain what is Apache Arrow. Imagine you want to explain it to a layman in an elevator.
 
+**Solution:** 
+```{bash}
+#| eval: false
+gunzip -c labevents_filtered.csv.gz > labevents_filtered.csv
+```
+
+```{r}
+# Open dataset using Apache Arrow
+dataset <- open_dataset("labevents_filtered.csv", format = "csv")
+
+# Filter and arrange the data
+filtered_data_arrow <- dataset %>%
+  select(subject_id, itemid, charttime, valuenum) %>%
+  arrange(subject_id, charttime, itemid) %>%
+  collect()
+
+# Display time taken
+start_time <- Sys.time()
+end_time <- Sys.time()
+time_taken <- end_time - start_time
+cat("Time taken for ingest, select, and filter:", round(time_taken, 4), "seconds\n")
+
+# Results
+cat("Number of rows in the result:", nrow(filtered_data_arrow), "\n")
+print(head(filtered_data_arrow, 10))
+
+```
+Apache Arrow is an organized digital library for data. Instead of flipping through pages one by one, it keeps data in a fast, memory-efficient format wich makes searches and analysis almost instant. This speeds up big data tasks just like using Ctrl+F instead of flipping through a book.
+
+
 ### Q2.5 Compress `labevents.csv` to Parquet format and ingest/select/filter
 
 <p align="center">
@@ -288,6 +318,46 @@ Write a few sentences to explain what is Apache Arrow. Imagine you want to expla
 Re-write the csv file `labevents.csv` in the binary Parquet format (Hint: [`arrow::write_dataset`](https://arrow.apache.org/docs/r/reference/write_dataset.html).) How large is the Parquet file(s)? How long does the ingest+select+filter process of the Parquet file(s) take? Display the number of rows and the first 10 rows of the result tibble and make sure they match those in Q2.3. (Hint: use `dplyr` verbs for selecting columns and filtering rows.)
 
 Write a few sentences to explain what is the Parquet format. Imagine you want to explain it to a layman in an elevator.
+
+**Solution:**
+```{r}
+csv_file <- "labevents_filtered.csv"
+parquet_file <- "labevents.parquet"
+
+# Convert CSV to Parquet
+start_time <- Sys.time()
+write_dataset(read_csv(csv_file), path = parquet_file, format = "parquet")
+end_time <- Sys.time()
+
+# Print time taken
+time_taken_conversion <- round(difftime(end_time, start_time, units = "secs"), 4)
+cat("Time taken to convert CSV to Parquet:", time_taken_conversion, "seconds\n")
+
+# Check file size
+file_info <- sum(
+  file.info(list.files(parquet_file, recursive = TRUE, full.names = TRUE))$size
+) / (1024^2)
+cat("Size of Parquet file:", round(file_info, 2), "MB\n")  
+
+# Measure time to ingest and filter the Parquet file
+start_time <- Sys.time()
+filtered_data_parquet <- open_dataset(parquet_file) %>%
+  select(subject_id, itemid, charttime, valuenum) %>%
+  filter(itemid %in% c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)) %>%
+  arrange(subject_id, charttime, itemid) %>%
+  collect()
+end_time <- Sys.time()
+
+# Print time taken
+time_taken_parquet <- round(difftime(end_time, start_time, units = "secs"), 4)
+cat("Time taken for ingest, select, and filter in Parquet:", time_taken_parquet, "seconds\n")
+
+# Display number of rows and first 10 rows
+cat("Number of rows in the result:", nrow(filtered_data_parquet), "\n")
+print(head(filtered_data_parquet, 10))
+
+```
+Parquet is functions  as a zip file for data tables becuase it stores large datasets in a compressed, column-based format, making it much faster to read, filter, and analyze compared to traditional CSVs. It’s great for big data because it saves space and speeds up processing.
 
 ### Q2.6 DuckDB
 
