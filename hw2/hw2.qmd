@@ -236,9 +236,6 @@ ls -lh labevents_filtered.csv.gz
 
 Displaying the first 10 lines
 ```{r}
-library(readr)
-library(dplyr)
-
 # Read the filtered dataset
 system.time(
   lab_data_2 <- read_csv("labevents_filtered.csv.gz")
@@ -355,7 +352,6 @@ cat("Time taken for ingest, select, and filter in Parquet:", time_taken_parquet,
 # Display number of rows and first 10 rows
 cat("Number of rows in the result:", nrow(filtered_data_parquet), "\n")
 print(head(filtered_data_parquet, 10))
-
 ```
 Parquet is functions  as a zip file for data tables becuase it stores large datasets in a compressed, column-based format, making it much faster to read, filter, and analyze compared to traditional CSVs. It’s great for big data because it saves space and speeds up processing.
 
@@ -370,6 +366,31 @@ Parquet is functions  as a zip file for data tables becuase it stores large data
 Ingest the Parquet file, convert it to a DuckDB table by [`arrow::to_duckdb`](https://arrow.apache.org/docs/r/reference/to_duckdb.html), select columns, and filter rows as in Q2.5. How long does the ingest+convert+select+filter process take? Display the number of rows and the first 10 rows of the result tibble and make sure they match those in Q2.3. (Hint: use `dplyr` verbs for selecting columns and filtering rows.)
 
 Write a few sentences to explain what is DuckDB. Imagine you want to explain it to a layman in an elevator.
+
+```{r}
+start_time <- Sys.time()
+parquet_dataset <- open_dataset("labevents.parquet")
+
+# Convert Arrow dataset to DuckDB table
+con <- dbConnect(duckdb::duckdb(), dbdir = ":memory:")
+duckdb_table <- to_duckdb(parquet_dataset, con = con, table_name = "labevents")
+
+# Select columns and filter rows
+filtered_data_duckdb <- duckdb_table %>%
+  select(subject_id, itemid, charttime, valuenum) %>%
+  filter(itemid %in% c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)) %>%
+  arrange(subject_id, charttime, itemid) %>%
+  collect()
+end_time <- Sys.time()
+time_taken <- round(difftime(end_time, start_time, units = "secs"), 4)
+
+# Display results
+cat("Time taken for ingest + convert + select + filter:", time_taken, "seconds\n")
+cat("Number of rows in result:", nrow(filtered_data_duckdb), "\n")
+print(head(filtered_data_duckdb, 10)) 
+
+```
+
 
 ## Q3. Ingest and filter `chartevents.csv.gz`
 
