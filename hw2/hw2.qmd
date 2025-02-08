@@ -3,7 +3,7 @@ title: "Biostat 203B Homework 2"
 subtitle: Due Feb 7, 2025 @ 11:59PM
 author: "Kiana Mohammadinik and 205928003"
 format:
-  html:
+  pdf:
     theme: cosmo
     embed-resources: true
     number-sections: false
@@ -187,7 +187,6 @@ Try to ingest only columns `subject_id`, `itemid`, `charttime`, and `valuenum` i
 
 **Solution:**
 ```{r}
-#| eval: false
 system.time(
   lab_data <- read_csv("~/mimic/hosp/labevents.csv.gz", 
                        col_select = c("subject_id", "itemid", "charttime",
@@ -238,11 +237,11 @@ Displaying the first 10 lines
 ```{r}
 # Read the filtered dataset
 system.time(
-  lab_data_2 <- read_csv("labevents_filtered.csv.gz")
+  lab_data <- read_csv("labevents_filtered.csv.gz")
 )
 
 # Sort dataset by subject_id, charttime, itemid
-lab_data_sorted <- lab_data_2 %>%
+lab_data_sorted <- lab_data %>%
   arrange(subject_id, charttime, itemid)
 
 # Display first 10 rows
@@ -277,7 +276,7 @@ Write a few sentences to explain what is Apache Arrow. Imagine you want to expla
 **Solution:** 
 ```{bash}
 #| eval: false
-gunzip -c labevents_filtered.csv.gz > labevents_filtered.csv
+gzip -d -c labevents_filtered.csv.gz > labevents_filtered.csv
 ```
 
 ```{r}
@@ -416,3 +415,29 @@ zcat < ~/mimic/icu/d_items.csv.gz | head -10
 In later exercises, we are interested in the vitals for ICU patients: heart rate (220045), mean non-invasive blood pressure (220181), systolic non-invasive blood pressure (220179), body temperature in Fahrenheit (223761), and respiratory rate (220210). Retrieve a subset of `chartevents.csv.gz` only containing these items, using the favorite method you learnt in Q2.
 
 Document the steps and show code. Display the number of rows and the first 10 rows of the result tibble.
+
+**Solution:**
+
+```{r}
+file_path <- "~/mimic/icu/chartevents.csv.gz"
+
+# Read the file efficiently with Arrow
+dataset <- open_dataset(file_path, format = "csv")
+
+# Filter only the relevant `itemid` values
+filtered_data <- dataset %>%
+  select(subject_id, itemid, charttime, valuenum) %>%
+  filter(itemid %in% c(220045, 220181, 220179, 223761, 220210)) %>%
+  arrange(subject_id, charttime, itemid) %>%
+  collect()  
+
+write_parquet(filtered_data, "chartevents_filtered.parquet")
+
+cat("Number of rows in filtered dataset:", nrow(filtered_data), "\n")
+
+# Display first 10 rows
+print(head(filtered_data, 10))
+```
+
+
+
