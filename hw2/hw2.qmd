@@ -425,7 +425,7 @@ dataset <- open_dataset(file_path, format = "csv")
 
 # Filter only the relevant `itemid` values
 filtered_data <- dataset %>%
-  select(subject_id, itemid, charttime, valuenum) %>%
+  select(subject_id, stay_id, itemid, charttime, storetime, valuenum) %>%
   filter(itemid %in% c(220045, 220181, 220179, 223761, 220210)) %>%
   arrange(subject_id, charttime, itemid) %>%
   collect()  
