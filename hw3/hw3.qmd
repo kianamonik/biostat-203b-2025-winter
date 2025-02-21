@@ -421,25 +421,14 @@ We are interested in the lab measurements of creatinine (50912), potassium (5097
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `labevents_pq` folder available at the current working directory `hw3`, for example, by a symbolic link.
 
 **Solution:**
-
-```{bash}
-ln -s ~/Desktop/BIOSTAT/"BIOSTAT 203B"/203B-hw/hw2/labevents_pq ~/Desktop/BIOSTAT/"BIOSTAT 203B"/203B-hw/hw3/labevents_pq
-```
-
 ```{bash}
 ln -s ~/biostat-203b-2025-winter/hw2/labevents_pq ./labevents_pq
 ls -l ./labevents_pq
 ```
 
 
-
 ```{r}
-labevents_tble <- read_parquet("labevents_pq/part-0.parquet")
 d_labitems_tble <- read_csv("~/mimic/hosp/d_labitems.csv.gz")
-```
-
-```{r}
-
 labevents_tble <- open_dataset(sources = "labevents_pq/part-0.parquet",
                                format = "parquet") |>
   to_duckdb() |>
@@ -455,15 +444,13 @@ labevents_tble <- open_dataset(sources = "labevents_pq/part-0.parquet",
   select(-charttime, -intime) |>
   ungroup() |>
   pivot_wider(names_from = itemid, values_from = valuenum) |>
-  rename_at(
-    vars(as.character(d_labitems_tble$label)),
-    ~ str_to_lower(as.character(d_labitems_tble$label))
-  ) |>
+  rename_with(~ str_to_lower(d_labitems_tble$label[match(.x, as.character(d_labitems_tble$itemid))]), 
+              .cols = everything()) |>
   collect() |>
   arrange(subject_id, stay_id) |>
-  relocate(subject_id, stay_id, .before = sort(names(.))) 
-
+  relocate(subject_id, stay_id, .before = everything()) 
 labevents_tble |> print(width = Inf)
+
 ```
 
 
