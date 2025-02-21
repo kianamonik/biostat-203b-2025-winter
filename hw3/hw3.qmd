@@ -34,6 +34,7 @@ library(ggplot2)
 library(dplyr)
 library(lubridate)
 library(stringr)
+library(duckdb)
 ```
 
 Display your machine memory.
@@ -65,6 +66,8 @@ procedures <- read_csv("~/mimic/hosp/procedures_icd.csv.gz")
 diagnoses <- read_csv("~/mimic/hosp/diagnoses_icd.csv.gz")
 d_icd_procedures <- read_csv("~/mimic/hosp/d_icd_procedures.csv.gz")
 d_icd_diagnoses <- read_csv("~/mimic/hosp/d_icd_diagnoses.csv.gz")
+icustays <- read_csv("~/mimic/icu/icustays.csv.gz")
+d_items <- read_csv("~/mimic/icu/d_items.csv.gz")
 ```
 
 ```{r}
@@ -80,15 +83,12 @@ diagnoses_info <- diagnoses %>% filter(subject_id == !!subject_id)
 
 ## plot
 ```{r, fig.width=12, fig.height=6, dpi=300}
-# Standardize icd_code format before merging
 diagnoses_info <- diagnoses_info %>%
   mutate(icd_code = str_pad(icd_code, width = 5, pad = "0"))
 
-# Merge diagnoses with descriptions
 diagnoses_info <- diagnoses_info %>% 
   left_join(d_icd_diagnoses, by = c("icd_code", "icd_version"))
 
-# Identify the correct long_title column for diagnoses
 long_title_col <- grep("long_title", colnames(diagnoses_info), value = TRUE)
 
 if ("long_title" %in% long_title_col) {
@@ -101,18 +101,15 @@ if ("long_title" %in% long_title_col) {
   stop("long_title column not found in diagnoses_info")
 }
 
-# Extract top 3 diagnoses, removing NA values
 top_diagnoses <- diagnoses_info %>% 
   filter(!is.na(diagnosis_name)) %>% 
   count(diagnosis_name, sort = TRUE) %>%  
   head(3) %>% 
   pull(diagnosis_name)
 
-# Only concatenate if there are valid diagnoses
 top_diagnoses_text <- ifelse(length(top_diagnoses) > 0,
   paste(top_diagnoses, collapse = "\n"), "")
 
-# Extract demographics, omitting NA values
 patient_summary <- paste(
   "Patient", 
   subject_id, 
@@ -121,25 +118,21 @@ patient_summary <- paste(
   paste(patient_info$anchor_age, "years old"))
 ) %>% str_squish() 
 
-# Convert timestamps
 transfers_info <- transfers_info %>%
   mutate(intime = as.POSIXct(intime, format="%Y-%m-%d %H:%M:%S"),
          outtime = as.POSIXct(outtime, format="%Y-%m-%d %H:%M:%S")) %>%
-  filter(!is.na(outtime))  # Remove missing outtimes
+  filter(!is.na(outtime))
 
 labevents_info <- labevents_info %>%
   mutate(chartdate = as.POSIXct(charttime, format="%Y-%m-%d %H:%M:%S"))
 
-# Join and resolve duplicate columns in procedures_info
 procedures_info <- procedures_info %>%
   mutate(chartdate = as.POSIXct(chartdate, format="%Y-%m-%d %H:%M:%S")) %>%
   left_join(d_icd_procedures, by = c("icd_code", "icd_version"))
 
-# Identify procedure name columns
 procedure_name_cols <- grep("long_title", colnames(procedures_info),
   value = TRUE)
 
-# Ensure only one unique procedure_name remains
 if (length(procedure_name_cols) > 1) {
   procedures_info <- procedures_info %>% 
   select(-one_of(procedure_name_cols[-1])) %>% 
@@ -151,21 +144,17 @@ if (length(procedure_name_cols) > 1) {
   stop("procedure_name column not found in procedures_info")
 }
 
-# Remove rows where procedure_name is missing
 procedures_info <- procedures_info %>% filter(!is.na(procedure_name))
 
-# Care unit colors
 care_unit_colors <- c("Emergency Department" = "red", 
                       "Medicine" = "green", 
                       "Neurology" = "cyan", 
                       "Surgical Intensive Care Unit (SICU)" = "purple")
 
-# Define procedure shapes
 procedure_shapes <- setNames(seq(15, 15 +
   length(unique(procedures_info$procedure_name)) - 1),
   unique(procedures_info$procedure_name))
 
-# Plot patient trajectory
 plot <- ggplot() +
   geom_segment(data = transfers_info, 
   aes(x = intime, xend = outtime,
@@ -184,21 +173,22 @@ plot <- ggplot() +
   y = NULL, 
   color = "Care Unit", 
   shape = "Procedure")
-
 print(plot)
 ```
 
 
-
-
-
 ### Q1.2 ICU stays
+```{r}
+head(icustays)
+```
 
 ICU stays are a subset of ADT history. This figure shows the vitals of the patient `10001217` during ICU stays. The x-axis is the calendar time, and the y-axis is the value of the vital. The color of the line represents the type of vital. The facet grid shows the abbreviation of the vital and the stay ID.
-
-
-
 Do a similar visualization for the patient `10063848`.
+
+
+
+
+
 
 ## Q2. ICU stays
 
@@ -210,10 +200,64 @@ zcat < ~/mimic/icu/icustays.csv.gz | head
 ### Q2.1 Ingestion
 
 Import `icustays.csv.gz` as a tibble `icustays_tble`. 
+**Solution:** 
+```{r}
+icustays_tble <- read_csv("~/mimic/icu/icustays.csv.gz")
+```
 
 ### Q2.2 Summary and visualization
 
 How many unique `subject_id`? Can a `subject_id` have multiple ICU stays? Summarize the number of ICU stays per `subject_id` by graphs. 
+
+**Solution:** 
+The number of unique values in `subject_id` 
+```{r}
+num_unique_subjects <- icustays_tble %>%
+  distinct(subject_id) %>%
+  count()
+
+cat("Number of unique subjects:", num_unique_subjects$n, "\n")
+```
+
+Checking if a subject has had multiple ICU stays
+```{r}
+icu_stay_counts <- icustays_tble %>%
+  group_by(subject_id) %>%
+  summarize(num_stays = n(), .groups = "drop")
+cat("Max ICU stays by a single patient:", max(icu_stay_counts$num_stays), "\n")
+
+num_multiple_stays <- icu_stay_counts %>%
+  filter(num_stays > 1) %>%
+  count()
+cat("Number of patients with multiple ICU stays:", num_multiple_stays$n, "\n")
+```
+
+Summarizeing the number of ICU stays per `subject_id` by graphs
+```{r, fig.width=12, fig.height=6, dpi=300}
+# Bar Chart of ICU Stay Counts
+icu_stay_counts %>%
+  count(num_stays) %>%
+  arrange(desc(n)) %>%
+  head(20) %>%
+  ggplot(aes(x = factor(num_stays), y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black", alpha = 0.8) +
+  labs(
+    title = "Frequency of ICU Stay Counts",
+    x = "Number of ICU Stays",
+    y = "Number of Patients"
+  ) +
+  theme_minimal()
+
+# Cumulative Frequency Plot
+ggplot(icu_stay_counts, aes(x = num_stays)) +
+  stat_ecdf(geom = "step", color = "red", size = 1) +
+  labs(
+    title = "Cumulative Distribution of ICU Stays per Patient",
+    x = "Number of ICU Stays",
+    y = "Cumulative Proportion"
+  ) +
+  theme_minimal()
+```
 
 ## Q3. `admissions` data
 
@@ -224,7 +268,13 @@ zcat < ~/mimic/hosp/admissions.csv.gz | head
 
 ### Q3.1 Ingestion
 
+
 Import `admissions.csv.gz` as a tibble `admissions_tble`.
+
+**Solution:**
+```{r}
+admissions_tble <- read_csv("~/mimic/hosp/admissions.csv.gz")
+```
 
 ### Q3.2 Summary and visualization
 
@@ -238,6 +288,105 @@ Summarize the following information by graphics and explain any patterns you see
 According to the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/about/concepts/#date-shifting), 
 
 > All dates in the database have been shifted to protect patient confidentiality. Dates will be internally consistent for the same patient, but randomly distributed in the future. Dates of birth which occur in the present time are not true dates of birth. Furthermore, dates of birth which occur before the year 1900 occur if the patient is older than 89. In these cases, the patient’s age at their first admission has been fixed to 300.
+
+**Solution:**
+Number of admissions per patient
+```{r}
+# Safely parse datetime columns using lubridate with NA handling
+admissions_tble <- admissions_tble %>%
+  mutate(
+    admittime_parsed = suppressWarnings(ymd_hms(admittime, quiet = TRUE)),
+    dischtime_parsed = suppressWarnings(ymd_hms(dischtime, quiet = TRUE))
+  )
+
+# Ensure that subsequent calculations use the parsed columns
+admissions_tble <- admissions_tble %>%
+  mutate(
+    admission_hour = if_else(!is.na(admittime_parsed), hour(admittime_parsed), NA_integer_),
+    admission_minute = if_else(!is.na(admittime_parsed), minute(admittime_parsed), NA_integer_),
+    los_days = if_else(
+      !is.na(admittime_parsed) & !is.na(dischtime_parsed),
+      as.numeric(difftime(dischtime_parsed, admittime_parsed, units = "days")),
+      NA_real_
+    )
+  )
+
+# Check for any NA values
+summary(admissions_tble$admission_hour)
+summary(admissions_tble$admission_minute)
+summary(admissions_tble$los_days)
+```
+```{r}
+# Safely parse datetime columns with suppressWarnings to prevent parsing warnings
+admissions_tble <- admissions_tble %>%
+  mutate(
+    admittime_parsed = suppressWarnings(ymd_hms(admittime, quiet = TRUE)),
+    dischtime_parsed = suppressWarnings(ymd_hms(dischtime, quiet = TRUE))
+  )
+
+# 1. Admission Hour
+admissions_tble <- admissions_tble %>%
+  mutate(admission_hour = if_else(!is.na(admittime_parsed), hour(admittime_parsed), NA_integer_))
+
+# 2. Admission Minute
+admissions_tble <- admissions_tble %>%
+  mutate(admission_minute = if_else(!is.na(admittime_parsed), minute(admittime_parsed), NA_integer_))
+
+# 3. Length of Hospital Stay (LOS)
+admissions_tble <- admissions_tble %>%
+  mutate(
+    los_days = if_else(
+      !is.na(admittime_parsed) & !is.na(dischtime_parsed),
+      as.numeric(difftime(dischtime_parsed, admittime_parsed, units = "days")),
+      NA_real_
+    )
+  )
+```
+
+
+Admission hour
+```{r}
+admissions_tble <- admissions_tble %>%
+  mutate(admission_hour = hour(ymd_hms(admittime)))
+
+summary(admissions_tble$admission_hour)
+ggplot(admissions_tble, aes(x = admission_hour)) +
+  geom_histogram(binwidth = 1, fill = "darkorange", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Admission Hours",
+       x = "Hour of Admission",
+       y = "Frequency")
+```
+ 
+Admission minute
+```{r}
+admissions_tble <- admissions_tble %>%
+  mutate(admission_minute = minute(ymd_hms(admittime)))
+
+summary(admissions_tble$admission_minute)
+ggplot(admissions_tble, aes(x = admission_minute)) +
+  geom_histogram(binwidth = 1, fill = "purple", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Admission Minutes",
+       x = "Minute of Admission",
+       y = "Frequency")
+```
+
+Length of hospital stay (from admission to discharge)
+```{r}
+admissions_tble <- admissions_tble %>%
+  mutate(los_days = as.numeric(difftime(ymd_hms(dischtime), ymd_hms(admittime), units = "days")))
+
+summary(admissions_tble$los_days)
+ggplot(admissions_tble, aes(x = los_days)) +
+  geom_histogram(binwidth = 1, fill = "seagreen", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Length of Hospital Stay",
+       x = "Length of Stay (days)",
+       y = "Frequency") +
+  xlim(0, 50)
+```
+
 
 ## Q4. `patients` data
 
@@ -269,8 +418,54 @@ zcat < ~/mimic/hosp/d_labitems.csv.gz | head
 We are interested in the lab measurements of creatinine (50912), potassium (50971), sodium (50983), chloride (50902), bicarbonate (50882), hematocrit (51221), white blood cell count (51301), and glucose (50931). Retrieve a subset of `labevents.csv.gz` that only containing these items for the patients in `icustays_tble`. Further restrict to the last available measurement (by `storetime`) before the ICU stay. The final `labevents_tble` should have one row per ICU stay and columns for each lab measurement.
 
 
-
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `labevents_pq` folder available at the current working directory `hw3`, for example, by a symbolic link.
+
+**Solution:**
+
+```{bash}
+ln -s ~/Desktop/BIOSTAT/"BIOSTAT 203B"/203B-hw/hw2/labevents_pq ~/Desktop/BIOSTAT/"BIOSTAT 203B"/203B-hw/hw3/labevents_pq
+```
+
+```{bash}
+ln -s ~/biostat-203b-2025-winter/hw2/labevents_pq ./labevents_pq
+ls -l ./labevents_pq
+```
+
+
+
+```{r}
+labevents_tble <- read_parquet("labevents_pq/part-0.parquet")
+d_labitems_tble <- read_csv("~/mimic/hosp/d_labitems.csv.gz")
+```
+
+```{r}
+
+labevents_tble <- open_dataset(sources = "labevents_pq/part-0.parquet",
+                               format = "parquet") |>
+  to_duckdb() |>
+  select(subject_id, itemid, charttime, valuenum) |>
+  filter(itemid %in% local(d_labitems_tble$itemid)) |>
+  left_join(
+    select(icustays_tble, subject_id, stay_id, intime),
+    by = c("subject_id" = "subject_id"),
+    copy = TRUE) |>
+  filter(charttime < intime) |>
+  group_by(subject_id, stay_id, itemid) |>
+  slice_max(charttime, n = 1) |>
+  select(-charttime, -intime) |>
+  ungroup() |>
+  pivot_wider(names_from = itemid, values_from = valuenum) |>
+  rename_at(
+    vars(as.character(d_labitems_tble$label)),
+    ~ str_to_lower(as.character(d_labitems_tble$label))
+  ) |>
+  collect() |>
+  arrange(subject_id, stay_id) |>
+  relocate(subject_id, stay_id, .before = sort(names(.))) 
+
+labevents_tble |> print(width = Inf)
+```
+
 
 ## Q6. Vitals from charted events
 
