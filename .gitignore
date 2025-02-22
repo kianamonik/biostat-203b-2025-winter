@@ -18,10 +18,16 @@
 # Output files from R CMD check
 /*.Rcheck/
 
+# Parquet files (MIMIC-IV data)
+chartevents_filtered.parquet
+labevents_pq
+/*.parquet
+.parquet
+
 # RStudio files
 .Rproj.user/
 
-# produced vignettes
+# Produced vignettes
 vignettes/*.html
 vignettes/*.pdf
 
@@ -42,10 +48,11 @@ vignettes/*.pdf
 # pkgdown site
 docs/
 
-# translation temp files
+# Translation temp files
 po/*~
 
 # RStudio Connect folder
 rsconnect/
-.DS_Store
+
+# macOS system file
 .DS_Store

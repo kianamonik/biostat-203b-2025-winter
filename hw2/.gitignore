@@ -5,3 +5,5 @@
 *.csv
 *.csv.gz
 *.parquet
+labevents_pq
+
