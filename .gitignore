@@ -17,10 +17,12 @@
 
 # Output files from R CMD check
 /*.Rcheck/
-
+chartevents_filtered.parquet
+/*.parquet
+labevents_pq
 # RStudio files
 .Rproj.user/
-
+.parquet
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
