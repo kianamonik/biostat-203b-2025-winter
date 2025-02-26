@@ -178,8 +178,6 @@ plot <- ggplot() +
   shape = "Procedure")
 print(plot)
 ```
-
-
 ### Q1.2 ICU stays
 **Solution:**
 ```{r, fig.width=12, fig.height=6, dpi=300}
@@ -230,11 +228,6 @@ ggplot(chartevents_with_labels, aes(x = charttime, y = valuenum,
 
 ICU stays are a subset of ADT history. This figure shows the vitals of the patient `10001217` during ICU stays. The x-axis is the calendar time, and the y-axis is the value of the vital. The color of the line represents the type of vital. The facet grid shows the abbreviation of the vital and the stay ID.
 Do a similar visualization for the patient `10063848`.
-
-
-
-
-
 
 ## Q2. ICU stays
 
@@ -340,98 +333,53 @@ Number of admissions per patient
 ```{r}
 admissions_tble <- admissions_tble %>%
   mutate(
-    admittime_parsed = suppressWarnings(ymd_hms(admittime, quiet = TRUE)),
-    dischtime_parsed = suppressWarnings(ymd_hms(dischtime, quiet = TRUE))
+    admission_hour = hour(admittime),
+    admission_minute = minute(admittime),
+    los_days = as.numeric(difftime(dischtime, admittime, units = "days"))
   )
 
 admissions_tble <- admissions_tble %>%
   mutate(
-    admission_hour = if_else(!is.na(admittime_parsed), hour(admittime_parsed)
-                             , NA_integer_),
-    admission_minute = if_else(!is.na(admittime_parsed),
-                               minute(admittime_parsed), NA_integer_),
-    los_days = if_else(
-      !is.na(admittime_parsed) & !is.na(dischtime_parsed),
-      as.numeric(difftime(dischtime_parsed, admittime_parsed, units = "days")),
-      NA_real_
-    )
+    admission_hour = hour(admittime),
+    admission_minute = minute(admittime),
+    los_days = as.numeric(difftime(dischtime, admittime, units = "days"))
   )
+
 
 summary(admissions_tble$admission_hour)
 summary(admissions_tble$admission_minute)
 summary(admissions_tble$los_days)
 ```
-```{r}
-admissions_tble <- admissions_tble %>%
-  mutate(
-    admittime_parsed = suppressWarnings(ymd_hms(admittime, quiet = TRUE)),
-    dischtime_parsed = suppressWarnings(ymd_hms(dischtime, quiet = TRUE))
-  )
-
-# 1. Admission Hour
-admissions_tble <- admissions_tble %>%
-  mutate(admission_hour = if_else(!is.na(admittime_parsed),
-                                  hour(admittime_parsed), NA_integer_))
-
-# 2. Admission Minute
-admissions_tble <- admissions_tble %>%
-  mutate(admission_minute = if_else(!is.na(admittime_parsed),
-                                    minute(admittime_parsed), NA_integer_))
-
-# 3. Length of Hospital Stay (LOS)
-admissions_tble <- admissions_tble %>%
-  mutate(
-    los_days = if_else(
-      !is.na(admittime_parsed) & !is.na(dischtime_parsed),
-      as.numeric(difftime(dischtime_parsed, admittime_parsed, units = "days")),
-      NA_real_
-    )
-  )
-```
-
+Explanation of Patterns:\
+Admission Hour: There is a peak around 0 AM and 7 AM, which is unusual\
+0 AM might reflect end-of-day admissions or data recording, while 7 AM may be related to shift changes.\
+Admission Minute: The 15-minute peak intervals (e.g., 15, 30, 45) might be due to rounding in documentation.\
+Length of Stay: Most patients stay between 1 and 5 days, with outliers staying longer due to severe conditions.\
 
 Admission hour
 ```{r}
-admissions_tble <- admissions_tble %>%
-  mutate(admission_hour = hour(ymd_hms(admittime)))
-
-summary(admissions_tble$admission_hour)
 ggplot(admissions_tble, aes(x = admission_hour)) +
   geom_histogram(binwidth = 1, fill = "darkorange", color = "black") +
   theme_minimal() +
-  labs(title = "Distribution of Admission Hours",
-       x = "Hour of Admission",
-       y = "Frequency")
+  labs(title = "Distribution of Admission Hours", x = "Hour of Admission", y = "Frequency") 
 ```
  
 Admission minute
 ```{r}
-admissions_tble <- admissions_tble %>%
-  mutate(admission_minute = minute(ymd_hms(admittime)))
-
-summary(admissions_tble$admission_minute)
 ggplot(admissions_tble, aes(x = admission_minute)) +
   geom_histogram(binwidth = 1, fill = "purple", color = "black") +
   theme_minimal() +
-  labs(title = "Distribution of Admission Minutes",
-       x = "Minute of Admission",
-       y = "Frequency")
+  labs(title = "Distribution of Admission Minutes", x = "Minute of Admission", y = "Frequency") +
+  annotate("text", x = 15, y = 20000, label = "15-min intervals", color = "blue")
 ```
 
 Length of hospital stay (from admission to discharge)
 ```{r}
-admissions_tble <- admissions_tble %>%
-  mutate(los_days = as.numeric(difftime(ymd_hms(dischtime), ymd_hms(admittime)
-                                        , units = "days")))
-
-summary(admissions_tble$los_days)
 ggplot(admissions_tble, aes(x = los_days)) +
   geom_histogram(binwidth = 1, fill = "seagreen", color = "black") +
   theme_minimal() +
-  labs(title = "Distribution of Length of Hospital Stay",
-       x = "Length of Stay (days)",
-       y = "Frequency") +
-  xlim(0, 50)
+  labs(title = "Distribution of Length of Hospital Stay", x = "Length of Stay (days)", y = "Frequency") +
+  annotate("text", x = 5, y = 100000, label = "Most stay within 5 days", color = "darkgreen")
 ```
 
 
@@ -459,33 +407,25 @@ Summarize variables `gender` and `anchor_age` by graphics, and explain any patte
 **Solution:**
 ```{r, fig.width=12, fig.height=6, dpi=300}
 # Gender Distribution
-gender_summary <- patients_tble %>%
-  count(gender) %>%
-  mutate(percent = n / sum(n) * 100)
-
-ggplot(gender_summary, aes(x = gender, y = percent, fill = gender)) +
-  geom_bar(stat = "identity", width = 0.6) +
-  geom_text(aes(label = paste0(round(percent, 1), "%")), vjust = -0.5,
-            size = 5) +
-  scale_fill_manual(values = c("F" = "#F8766D", "M" = "#00BFC4")) +
-  labs(
-    title = "Gender Distribution of Patients",
-    x = "Gender",
-    y = "Percentage"
-  ) +
+ggplot(patients_tble, aes(x = gender)) +
+  geom_bar(fill = "#F8766D") +
+  labs(title = "Gender Distribution of Patients", x = "Gender", y = "Count") +
   theme_minimal()
 
 # Anchor Age Distribution
 ggplot(patients_tble, aes(x = anchor_age)) +
   geom_histogram(binwidth = 5, fill = "#619CFF", color = "black", alpha = 0.7) +
-  labs(
-    title = "Distribution of Patient Ages",
-    x = "Anchor Age",
-    y = "Count"
-  ) +
+  labs(title = "Distribution of Patient Ages", x = "Anchor Age", y = "Count") +
   theme_minimal()
-
 ```
+Explanation of Gender Distribution:\
+The dataset has a fairly balanced gender distribution, with slightly more females than males.\
+Explanation of Anchor Age Distribution:\
+The age distribution shows that most patients are between 50 and 80 years old, which is expected given the ICU setting.\
+The sharp peak at age 91 is due to the MIMIC-IV data de-identification process, where patients older than 89 are all assigned an age of 91.\
+
+
+
 
 ## Q5. Lab results
 
@@ -504,32 +444,25 @@ Hint: Use the Parquet format you generated in Homework 2. For reproducibility, m
 
 **Solution:**
 ```{r}
-d_labitems_tble <- read_csv("~/mimic/hosp/d_labitems.csv.gz")
-labevents_tble <- open_dataset(sources = "labevents_pq/part-0.parquet",
-                               format = "parquet") |>
-  to_duckdb() |>
-  select(subject_id, itemid, charttime, valuenum) |>
-  filter(itemid %in% local(d_labitems_tble$itemid)) |>
-  left_join(
-    select(icustays_tble, subject_id, stay_id, intime),
-    by = c("subject_id" = "subject_id"),
-    copy = TRUE) |>
-  filter(charttime < intime) |>
-  group_by(subject_id, stay_id, itemid) |>
-  slice_max(charttime, n = 1) |>
-  select(-charttime, -intime) |>
-  ungroup() |>
-  pivot_wider(names_from = itemid, values_from = valuenum) |>
-  rename_with(~ str_to_lower(d_labitems_tble$label[match(.x
-              , as.character(d_labitems_tble$itemid))]), 
-              .cols = everything()) |>
-  collect() |>
-  arrange(subject_id, stay_id) |>
-  relocate(subject_id, stay_id, .before = everything()) 
-labevents_tble |> print(width = Inf)
+d_labitems_tble <- read_csv("~/mimic/hosp/d_labitems.csv.gz") %>%
+  filter(itemid %in% c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)) 
+labevents_tble <- open_dataset(sources = "labevents_pq/part-0.parquet", format = "parquet") |> 
+  to_duckdb() |> 
+  select(subject_id, itemid, storetime, valuenum) |> 
+  filter(itemid %in% local(d_labitems_tble$itemid)) |> 
+  left_join(select(icustays_tble, subject_id, stay_id, intime), by = c("subject_id" = "subject_id"), copy = TRUE) |> 
+  filter(storetime < intime) |> 
+  group_by(subject_id, stay_id, itemid) |> 
+  slice_max(storetime, n = 1) |> 
+  select(-storetime, -intime) |> 
+  ungroup() |> 
+  pivot_wider(names_from = itemid, values_from = valuenum) |> 
+  rename_with(~ str_to_lower(d_labitems_tble$label[match(.x, as.character(d_labitems_tble$itemid))]), .cols = everything()) |> 
+  collect() |> 
+  arrange(subject_id, stay_id) |> 
+  relocate(subject_id, stay_id, .before = everything())
+cat("Final number of rows:", nrow(labevents_tble), "\n")
 ```
-
-
 
 ## Q6. Vitals from charted events
 
@@ -559,38 +492,44 @@ vital_ids <- c(
   "respiratory_rate" = 220210
 )
 
-chartevents_filtered <- chartevents_pq %>%
-  semi_join(icustays_tble, by = "stay_id") %>%
-  filter(itemid %in% vital_ids) %>%
-  mutate(storetime = as.POSIXct(storetime, format = "%Y-%m-%d %H:%M:%S",
-                                tz = "UTC")) %>%
-  arrange(subject_id, stay_id, itemid, storetime)
+subset_chartevents <- chartevents_pq %>%
+  mutate(
+    storetime = as.POSIXct(storetime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
+    charttime = as.POSIXct(charttime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
+  )
+
+chartevents_filtered <- subset_chartevents %>%
+  inner_join(icustays_tble, by = "stay_id") %>%
+  filter(storetime >= intime & storetime < outtime)
 
 chartevents_filtered <- chartevents_filtered %>%
+  rename(subject_id = subject_id.x) %>%
+  select(-subject_id.y)
+
+first_store_per_stay <- chartevents_filtered %>%
   group_by(subject_id, stay_id, itemid) %>%
-  slice_head(n = 1) %>%
+  arrange(storetime) %>%
+  slice_min(order_by = storetime, n = 1) %>%
   ungroup()
 
 chartevents_filtered <- chartevents_filtered %>%
+  inner_join(
+    first_store_per_stay %>% select(subject_id, stay_id, itemid, storetime),
+    by = c("subject_id", "stay_id", "itemid", "storetime")
+  ) %>%
+  select(-storetime)
+
+chartevents_filtered <- chartevents_filtered %>%
   group_by(subject_id, stay_id, itemid) %>%
-  summarise(valuenum_avg = mean(valuenum, na.rm = TRUE), .groups = "drop")
+  summarize(valuenum_avg = mean(valuenum, na.rm = TRUE), .groups = "drop") %>%
+  ungroup()
 
 chartevents_tble <- chartevents_filtered %>%
   pivot_wider(
     names_from = itemid,
     values_from = valuenum_avg,
-    names_glue = "vital_{itemid}"
-  )
-
-required_cols <- c("vital_220045", "vital_220179", "vital_220180",
-                   "vital_223761", "vital_220210")
-for (col in required_cols) {
-  if (!col %in% colnames(chartevents_tble)) {
-    chartevents_tble[[col]] <- NA_real_
-  }
-}
-
-chartevents_tble <- chartevents_tble %>%
+    names_prefix = "vital_"
+  ) %>%
   rename(
     heart_rate = vital_220045,
     non_invasive_blood_pressure_systolic = vital_220179,
@@ -600,14 +539,8 @@ chartevents_tble <- chartevents_tble %>%
   ) %>%
   arrange(subject_id, stay_id)
 
-print(chartevents_tble)
+cat("Final number of rows:", nrow(chartevents_tble), "\n")
 ```
-
-
-
-
-
-
 
 ## Q7. Putting things together
 
@@ -636,7 +569,7 @@ icustays_filtered <- icustays_tble %>%
   inner_join(patients_tble %>%
                select(subject_id, anchor_age, anchor_year, anchor_year_group, dod, gender),
              by = "subject_id") %>%
-  filter(anchor_age >= 18)
+  filter(age_at_intime >= 18)
 
 admissions_selected <- admissions_tble
 
@@ -665,17 +598,17 @@ Summarize the following information about the ICU stay cohort `mimic_icu_cohort`
 ```{r, fig.width=12, fig.height=6, dpi=300}
 
 mimic_icu_cohort %>%
-  select(los, race, insurance, marital_status, gender, anchor_age) %>%
+  select(los, race, insurance, marital_status, gender, age_at_intime) %>%
   summary()
 
-ggplot(mimic_icu_cohort, aes(x = anchor_age, y = los)) +
+ggplot(mimic_icu_cohort, aes(x = marital_status, y = los)) +
   geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", color = "blue") +
-  labs(title = "ICU Length of Stay vs Age", x = "Age",
+  labs(title = "ICU Length of Stay vs Marital_Status", x = "Marital_Status",
        y = "Length of Stay (days)")
 
 
-ggplot(mimic_icu_cohort, aes(x = anchor_age, y = los)) +
+ggplot(mimic_icu_cohort, aes(x = age_at_intime, y = los)) +
   geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", color = "blue") +
   labs(title = "ICU Length of Stay vs Age", x = "Age",
