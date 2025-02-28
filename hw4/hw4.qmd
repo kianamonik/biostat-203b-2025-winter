@@ -154,6 +154,63 @@ Connect to `chartevents` table and retrieve a subset that only contain subjects 
 ```{r}
 # # TODO
 # chartevents_tble <- 
+vital_signs <- c(
+  220045,  
+  220179,  
+  220180, 
+  223761,  
+  220210   
+)
+
+chartevents_tble <- tbl(con_bq, "chartevents") |>
+  filter(itemid %in% vital_signs) |>
+  select(subject_id, stay_id, itemid, valuenum, storetime, charttime)
+
+chartevents_tble <- chartevents_tble |>
+  inner_join(
+    icustays_tble |> select(subject_id, stay_id, intime, outtime),
+    by = "stay_id"
+  )
+
+chartevents_tble <- chartevents_tble |>
+  filter(storetime >= intime & storetime < outtime)
+
+chartevents_tble <- chartevents_tble |>
+  select(-subject_id_y) |> 
+  rename(subject_id = subject_id_x)
+
+chartevents_tble <- chartevents_tble |>
+  group_by(subject_id, stay_id, itemid) |>
+  arrange(storetime) |>
+  slice_min(order_by = storetime, n = 1, with_ties = TRUE) |>
+  ungroup()
+
+chartevents_tble <- chartevents_tble |>
+  group_by(subject_id, stay_id, itemid) |>
+  summarise(average_value = mean(valuenum, na.rm = TRUE), .groups = "drop")
+
+chartevents_tble <- chartevents_tble |>
+  pivot_wider(
+    names_from = itemid,
+    values_from = average_value,
+    names_prefix = "vital_"
+  )
+
+chartevents_tble <- chartevents_tble |>
+  rename(
+    heart_rate = vital_220045,
+    blood_pressure_systolic = vital_220179,
+    blood_pressure_diastolic = vital_220180,
+    temperature_f = vital_223761,
+    respiratory_rate = vital_220210
+  )
+
+chartevents_tble <- chartevents_tble |>
+  arrange(subject_id, stay_id)
+
+chartevents_tble |> summarise(row_count = n())
+
+chartevents_tble
 ```
 
 ### Q1.7 Put things together
