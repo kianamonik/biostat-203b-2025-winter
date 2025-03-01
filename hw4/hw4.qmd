@@ -143,7 +143,7 @@ labevents_tble <- labevents_tble |>
   select(subject_id, stay_id, bicarbonate, chloride, creatinine, 
          glucose, potassium, sodium, hematocrit, wbc) |>
   arrange(subject_id, stay_id)
-
+labevents_tble <- labevents_tble |> collect()
 labevents_tble |> summarise(row_count = n())
 labevents_tble
 ```
@@ -207,6 +207,7 @@ chartevents_tble <- chartevents_tble |>
 
 chartevents_tble <- chartevents_tble |>
   arrange(subject_id, stay_id)
+chartevents_tble <- chartevents_tble |> collect()
 
 chartevents_tble |> summarise(row_count = n())
 
@@ -220,7 +221,42 @@ This step is similar to Q7 of HW3. Using _one_ chain of pipes `|>` to perform fo
 ```{r}
 # # TODO
 # mimic_icu_cohort <-  
+icustays_age <- icustays_tble |>
+  mutate(intime_year = lubridate::year(as.Date(intime)))
+
+age_at_intime <- icustays_age |>
+  left_join(
+    patients_tble |> select(subject_id, anchor_age, anchor_year),
+    by = "subject_id"
+  ) |>
+  mutate(age_at_intime = anchor_age + (intime_year - anchor_year)) |>
+  select(subject_id, stay_id, age_at_intime)
+
+icustays_filtered <- icustays_tble |>
+  left_join(age_at_intime, by = c("subject_id", "stay_id")) |>
+  inner_join(
+    patients_tble |> select(subject_id, anchor_age, anchor_year, anchor_year_group, dod, gender),
+    by = "subject_id"
+  ) |>
+  filter(age_at_intime >= 18)
+
+icustays_filtered <- icustays_filtered |> collect()
+
+admissions_selected <- admissions_tble |>
+  select(subject_id, hadm_id, race, insurance, admission_type, admission_location, discharge_location) |>
+  collect()
+
+mimic_icu_cohort <- icustays_filtered |>
+  left_join(admissions_selected, by = c("subject_id", "hadm_id")) |>
+  left_join(chartevents_tble, by = c("subject_id", "stay_id")) |>
+  left_join(labevents_tble, by = c("subject_id", "stay_id")) |>
+  distinct() |>
+  arrange(subject_id, hadm_id, stay_id)
+
+print(mimic_icu_cohort, width = Inf)
+glimpse(mimic_icu_cohort)
 ```
+
 
 ### Q1.8 Preprocessing
 
