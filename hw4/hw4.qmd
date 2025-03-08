@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 4"
 subtitle: "Due Mar 9 @ 11:59PM"
-author: "Your Name and UID"
+author: "Kiana Mohamadinik and 205928003"
 format:
   html:
     theme: cosmo
@@ -11,6 +11,10 @@ format:
     toc-depth: 4
     toc-location: left
     code-fold: false
+  pdf:
+    number-sections: true
+    toc: true
+    toc-depth: 3
 ---
 
 Display machine information:
@@ -113,10 +117,12 @@ labevents_tble <- tbl(con_bq, "labevents") |>
   arrange(subject_id, storetime, itemid)
 
 labevents_tble <- labevents_tble |>
-  inner_join(icustays_tble |> select(subject_id, stay_id, intime), by = "subject_id")
+  inner_join(icustays_tble |> select(subject_id, stay_id, intime),
+             by = "subject_id")
 
 labevents_tble <- labevents_tble |>
-  filter(storetime < intime)
+  filter(storetime < intime) |>
+  mutate(valuenum = as.numeric(valuenum))
 
 labevents_tble <- labevents_tble |>
   group_by(subject_id, stay_id, itemid) |>
@@ -199,9 +205,9 @@ chartevents_tble <- chartevents_tble |>
 chartevents_tble <- chartevents_tble |>
   rename(
     heart_rate = vital_220045,
-    blood_pressure_systolic = vital_220179,
-    blood_pressure_diastolic = vital_220180,
-    temperature_f = vital_223761,
+    non_invasive_blood_pressure_systolic = vital_220179,
+    non_invasive_blood_pressure_diastolic = vital_220180,
+    temperature_fahrenheit = vital_223761,
     respiratory_rate = vital_220210
   )
 
@@ -235,7 +241,8 @@ age_at_intime <- icustays_age |>
 icustays_filtered <- icustays_tble |>
   left_join(age_at_intime, by = c("subject_id", "stay_id")) |>
   inner_join(
-    patients_tble |> select(subject_id, anchor_age, anchor_year, anchor_year_group, dod, gender),
+    patients_tble |> select(subject_id, gender, anchor_age, anchor_year,
+                            anchor_year_group, dod),
     by = "subject_id"
   ) |>
   filter(age_at_intime >= 18)
@@ -243,20 +250,23 @@ icustays_filtered <- icustays_tble |>
 icustays_filtered <- icustays_filtered |> collect()
 
 admissions_selected <- admissions_tble |>
-  select(subject_id, hadm_id, race, insurance, admission_type, admission_location, discharge_location) |>
+  select(subject_id, hadm_id, admittime, dischtime, deathtime,
+         admission_type, admission_location, discharge_location,
+         insurance, language, marital_status, edregtime, edouttime, 
+         hospital_expire_flag, admit_provider_id, race) |>
   collect()
+
 
 mimic_icu_cohort <- icustays_filtered |>
   left_join(admissions_selected, by = c("subject_id", "hadm_id")) |>
   left_join(chartevents_tble, by = c("subject_id", "stay_id")) |>
   left_join(labevents_tble, by = c("subject_id", "stay_id")) |>
-  distinct() |>
+  distinct() |>   
   arrange(subject_id, hadm_id, stay_id)
 
 print(mimic_icu_cohort, width = Inf)
 glimpse(mimic_icu_cohort)
 ```
-
 
 ### Q1.8 Preprocessing
 
@@ -265,6 +275,82 @@ Perform the following preprocessing steps. (i) Lump infrequent levels into "Othe
 Hint: Below is a numerical summary of my tibble after preprocessing:
 
 <iframe width=95% height="500" src="./mimic_icu_cohort_gtsummary.html"></iframe>
+```{r}
+library(forcats)
+unique(mimic_icu_cohort$first_careunit)
+unique(mimic_icu_cohort$last_careunit)
+unique(mimic_icu_cohort$admission_type)
+unique(mimic_icu_cohort$admission_location)
+unique(mimic_icu_cohort$discharge_location)
+unique(mimic_icu_cohort$race)
+summary(mimic_icu_cohort$los)
+```
+
+```{r}
+library(forcats)
+library(gtsummary)
+
+mimic_icu_cohort_preprocessed <- mimic_icu_cohort |> 
+  mutate(
+    first_careunit = fct_lump_n(first_careunit, n = 4, other_level = "Other"),
+    last_careunit = fct_lump_n(last_careunit, n = 4, other_level = "Other"),
+    admission_type = fct_lump_n(admission_type, n = 4, other_level = "Other"),
+    admission_location = fct_lump_n(admission_location,
+                                    n = 3, other_level = "Other"), 
+    discharge_location = fct_lump_n(discharge_location,
+                                    n = 4, other_level = "Other")
+  ) |>
+  mutate(
+    race = fct_collapse(
+      race,
+      ASIAN = c("ASIAN", "ASIAN - VIETNAMESE", "ASIAN - CHINESE", 
+                "ASIAN - FILIPINO", "ASIAN - OTHER", "ASIAN - SOUTH EAST ASIAN",
+                "ASIAN - KOREAN", "ASIAN - ASIAN INDIAN"),
+      BLACK = c("BLACK/AFRICAN AMERICAN", "BLACK/CAPE VERDEAN", "BLACK/HAITIAN",
+                "BLACK/AFRICAN", "BLACK/CARIBBEAN ISLAND"),
+      HISPANIC = c("HISPANIC OR LATINO", "HISPANIC/LATINO - PUERTO RICAN", 
+                   "HISPANIC/LATINO - DOMINICAN", "HISPANIC/LATINO - CUBAN", 
+                   "HISPANIC/LATINO - CENTRAL AMERICAN", 
+                   "HISPANIC/LATINO - SOUTH AMERICAN",
+                   "HISPANIC/LATINO - MEXICAN",
+                   "HISPANIC/LATINO - SALVADORAN",
+                   "HISPANIC/LATINO - GUATEMALAN",
+                   "HISPANIC/LATINO - HONDURAN", "HISPANIC/LATINO - COLUMBIAN"),
+      WHITE = c("WHITE", "WHITE - RUSSIAN", "WHITE - BRAZILIAN", 
+                "WHITE - OTHER EUROPEAN", "WHITE - EASTERN EUROPEAN"),
+      Other = c("AMERICAN INDIAN/ALASKA NATIVE",
+                "NATIVE HAWAIIAN OR OTHER PACIFIC ISLANDER",
+                "MULTIPLE RACE/ETHNICITY", "UNABLE TO OBTAIN", "UNKNOWN",
+                "PATIENT DECLINED TO ANSWER", "SOUTH AMERICAN", "OTHER",
+                "PORTUGUESE")
+    )
+  ) |>
+  mutate(
+    los_long = los >= 2
+  ) |>
+  mutate(
+    temperature_fahrenheit = ifelse(is.na(temperature_fahrenheit), NA,
+                                    temperature_fahrenheit)
+  )
+
+summary_table <- mimic_icu_cohort_preprocessed |> 
+  select(
+    los_long, los, gender, race, age_at_intime, insurance, 
+    first_careunit, last_careunit, admission_type, 
+    admission_location, discharge_location, language, 
+    marital_status, hospital_expire_flag, dod, 
+    bicarbonate, chloride, creatinine, glucose, potassium, sodium, hematocrit,
+    wbc, heart_rate, non_invasive_blood_pressure_systolic,
+    non_invasive_blood_pressure_diastolic, 
+    temperature_fahrenheit, respiratory_rate
+  ) |> 
+  tbl_summary(
+    by = los_long,
+    missing = "ifany"
+  )
+
+summary_table
+```
 
 ### Q1.9 Save the final tibble
 
@@ -290,4 +376,3 @@ Although it is not a good practice to add big data files to Git, for grading pur
 ## Q2. Shiny app
 
 Develop a Shiny app for exploring the ICU cohort data created in Q1. The app should reside in the `mimiciv_shiny` folder. The app should contain at least two tabs. One tab provides easy access to the graphical and numerical summaries of variables (demographics, lab measurements, vitals) in the ICU cohort, using the `mimic_icu_cohort.rds` you curated in Q1. The other tab allows user to choose a specific patient in the cohort and display the patient's ADT and ICU stay information as we did in Q1 of HW3, by dynamically retrieving the patient's ADT and ICU stay information from BigQuery database. Again, do **not** ever add the BigQuery token to your Git repository. If you do so, you will lose 50 points.
-
