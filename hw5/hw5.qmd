@@ -34,7 +34,14 @@ mimiciv_icu_cohort <- read_rds("/Users/kiananik/Desktop/BIOSTAT/BIOSTAT 203B/203
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
   mutate(los_long = as.factor(los > 2))
 
-# Selecting relevant features 
+# sort
+mimiciv_icu_cohort <- mimiciv_icu_cohort |>
+  arrange(subject_id, hadm_id, stay_id)
+
+# Selecting relevant features
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
+  select(
+    -subject_id, -hadm_id, -stay_id)
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
   select(
     los_long, 
@@ -62,13 +69,11 @@ prepped_data <- preprocess_recipe |> prep() |> juice()
 
 glimpse(prepped_data)
 ```
+
+
 2. Partition data into 50% training set and 50% test set. Stratify partitioning according to `los_long`. For grading purpose, sort the data by `subject_id`, `hadm_id`, and `stay_id` and use the seed `203` for the initial data split. Below is the sample code.
 ```{r}
 set.seed(203)
-
-# sort
-mimiciv_icu_cohort <- mimiciv_icu_cohort |>
-  arrange(subject_id, hadm_id, stay_id)
 
 data_split <- initial_split(
   mimiciv_icu_cohort, 
@@ -79,6 +84,10 @@ data_split <- initial_split(
 
 train_data <- training(data_split)
 test_data  <- testing(data_split)
+
+# Check class distribution
+train_data |> count(los_long)
+test_data  |> count(los_long)
 ```
 
 3. Train and tune the models using the training set.
