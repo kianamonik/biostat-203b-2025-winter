@@ -31,7 +31,36 @@ Using the ICU cohort `mimiciv_icu_cohort.rds` you built in Homework 4, develop a
 1. Data preprocessing and feature engineering.
 ```{r}
 mimiciv_icu_cohort <- read_rds("/Users/kiananik/Desktop/BIOSTAT/BIOSTAT 203B/203B-hw/hw4/mimiciv_shiny/mimic_icu_cohort.rds")
-mimiciv_icu_cohort <- mimiciv_icu_cohort |> mutate(los_long = los >= 2)
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
+  mutate(los_long = as.factor(los > 2))
+
+# Selecting relevant features 
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
+  select(
+    los_long, 
+    gender, age_at_intime, marital_status, race, first_careunit,
+    non_invasive_blood_pressure_systolic, temperature_fahrenheit,
+    respiratory_rate, 
+    non_invasive_blood_pressure_diastolic, heart_rate,
+    bicarbonate, chloride, creatinine, glucose, potassium, sodium,
+    hematocrit, wbc
+  ) 
+
+# Converting categorical variables to factors
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
+  mutate(across(c(gender, marital_status, race, first_careunit), as.factor))
+
+# Handling missing values
+preprocess_recipe <- recipe(los_long ~ ., data = mimiciv_icu_cohort) |>
+  step_impute_median(all_numeric_predictors()) |> 
+  step_impute_mode(all_nominal_predictors()) |>   
+  step_normalize(all_numeric_predictors()) |>   
+  step_dummy(all_nominal_predictors(), -all_outcomes())
+
+# Preparing the processed dataset
+prepped_data <- preprocess_recipe |> prep() |> juice()
+
+glimpse(prepped_data)
 ```
 2. Partition data into 50% training set and 50% test set. Stratify partitioning according to `los_long`. For grading purpose, sort the data by `subject_id`, `hadm_id`, and `stay_id` and use the seed `203` for the initial data split. Below is the sample code.
 ```{r}
