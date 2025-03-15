@@ -24,6 +24,10 @@ library(dplyr)
 library(recipes)
 library(tidymodels)
 library(stacks)
+library(finetune)  
+library(doParallel)
+library(dials) 
+library(vip)
 ```
 
 Using the ICU cohort `mimiciv_icu_cohort.rds` you built in Homework 4, develop at least three machine learning approaches (logistic regression with enet regularization, random forest, boosting, SVM, MLP, etc) plus a model stacking approach for predicting whether a patient's ICU stay will be longer than 2 days. You should use the `los_long` variable as the outcome. You algorithms can use patient demographic information (gender, age at ICU `intime`, marital status, race), ICU admission information (first care unit), the last lab measurements before the ICU stay, and first vital measurements during ICU stay as features. You are welcome to use any feature engineering techniques you think are appropriate; but make sure to not use features that are not available at an ICU stay's `intime`. For instance, `last_careunit` cannot be used in your algorithms. 
@@ -57,6 +61,19 @@ mimiciv_icu_cohort <- mimiciv_icu_cohort |>
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
   mutate(across(c(gender, marital_status, race, first_careunit), as.factor))
 
+# Ensure `los_long` has no missing values
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> drop_na(los_long)
+
+# Identify columns with less than 1000 missing values
+valid_columns <- mimiciv_icu_cohort |> 
+  summarise(across(everything(), ~ sum(is.na(.)))) |> 
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "missing_count") |> 
+  filter(missing_count < 1000) |> 
+  pull(variable)
+
+# Subset dataset to keep only valid columns
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> select(all_of(valid_columns))
+
 # Handling missing values
 preprocess_recipe <- recipe(los_long ~ ., data = mimiciv_icu_cohort) |>
   step_impute_median(all_numeric_predictors()) |> 
@@ -76,7 +93,7 @@ glimpse(prepped_data)
 set.seed(203)
 
 data_split <- initial_split(
-  mimiciv_icu_cohort, 
+  prepped_data, 
   # stratify by los_long
   strata = "los_long", 
   prop = 0.5
@@ -91,5 +108,113 @@ test_data  |> count(los_long)
 ```
 
 3. Train and tune the models using the training set.
+```{r}
+# Setup Parallel Processing 
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+
+# Logistic Regression with Elastic Net Regularization
+log_spec <- logistic_reg(
+  penalty = tune(),
+  mixture = tune()
+) %>%
+  set_engine("glmnet") %>%
+  set_mode("classification")
+
+log_wf <- workflow() %>%
+  add_model(log_spec) %>%
+  add_formula(los_long ~ .)  
+
+# Random Forest Model
+rf_spec <- rand_forest(
+  mtry = tune(),
+  min_n = tune(),
+  trees = 250
+) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+rf_wf <- workflow() %>%
+  add_model(rf_spec) %>%
+  add_formula(los_long ~ .)  
+
+# Boosted Trees (XGBoost)
+xgb_spec <- boost_tree(
+  trees = tune(),
+  tree_depth = tune(),
+  learn_rate = tune(),
+  loss_reduction = tune(),
+  sample_size = tune(),
+  min_n = tune()
+) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+xgb_wf <- workflow() %>%
+  add_model(xgb_spec) %>%
+  add_formula(los_long ~ .) 
+
+# Cross-validation Setup 
+set.seed(203)
+folds <- vfold_cv(train_data, v = 3, strata = los_long)  
+
+# Tuning Grids 
+
+# Logistic Regression Grid (Regular Grid Search)
+log_grid <- grid_regular(
+  penalty(range = c(0.0001, 1)),
+  mixture(range = c(0, 1)),
+  levels = 3 
+)
+
+# Finalize mtry based on training data for Random Forest
+final_mtry <- finalize(mtry(), train_data)
+
+rf_grid <- grid_random(
+  finalize(parameters(rf_spec), train_data),
+  size = 5  
+)
+
+# XGBoost Grid with reduced size
+xgb_grid <- grid_random(
+  extract_parameter_set_dials(xgb_spec),
+  size = 10  
+)
+
+# Verbose to see progress
+ctrl <- control_grid(verbose = TRUE)
+
+# Tuning Each Model 
+set.seed(203)
+log_res <- tune_grid(
+  log_wf,
+  resamples = folds,
+  grid = log_grid,
+  metrics = metric_set(roc_auc, accuracy),
+  control = ctrl
+)
+
+set.seed(203)
+rf_res <- tune_grid(
+  rf_wf,
+  resamples = folds,
+  grid = rf_grid,
+  metrics = metric_set(roc_auc, accuracy),
+  control = ctrl
+)
+
+set.seed(203)
+xgb_res <- tune_grid(
+  xgb_wf,
+  resamples = folds,
+  grid = xgb_grid,
+  metrics = metric_set(roc_auc, accuracy),
+  control = ctrl
+)
+
+# Stop Parallel Cluster
+stopCluster(cl)
+```
+
 
 4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
