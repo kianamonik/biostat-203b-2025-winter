@@ -109,9 +109,10 @@ test_data  |> count(los_long)
 
 3. Train and tune the models using the training set.
 ```{r}
-# Setup Parallel Processing 
-cl <- makeCluster(detectCores())
-registerDoParallel(cl)
+library(future)
+
+# Setup Parallel Processing using future
+plan(multisession, workers = parallel::detectCores() - 1)
 
 # Logistic Regression with Elastic Net Regularization
 log_spec <- logistic_reg(
@@ -160,24 +161,22 @@ folds <- vfold_cv(train_data, v = 3, strata = los_long)
 
 # Tuning Grids 
 
-# Logistic Regression Grid (Regular Grid Search)
+# Logistic Regression Grid 
 log_grid <- grid_regular(
   penalty(range = c(0.0001, 1)),
   mixture(range = c(0, 1)),
   levels = 3 
 )
 
-# Finalize mtry based on training data for Random Forest
-final_mtry <- finalize(mtry(), train_data)
-
+# Random Forest Grid
 rf_grid <- grid_random(
-  finalize(parameters(rf_spec), train_data),
+  finalize(extract_parameter_set_dials(rf_spec), train_data), 
   size = 5  
 )
 
-# XGBoost Grid with reduced size
+# XGBoost Grid
 xgb_grid <- grid_random(
-  extract_parameter_set_dials(xgb_spec),
+  extract_parameter_set_dials(xgb_spec),  
   size = 10  
 )
 
@@ -212,9 +211,15 @@ xgb_res <- tune_grid(
   control = ctrl
 )
 
-# Stop Parallel Cluster
-stopCluster(cl)
+# Reset Parallel Processing
+plan(sequential) 
+
 ```
 
 
 4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
+
+```{r}
+
+```
+
