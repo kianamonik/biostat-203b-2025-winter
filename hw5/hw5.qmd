@@ -28,6 +28,9 @@ library(finetune)
 library(doParallel)
 library(dials) 
 library(vip)
+library(future)
+library(stacks)
+library(tune)
 ```
 
 Using the ICU cohort `mimiciv_icu_cohort.rds` you built in Homework 4, develop at least three machine learning approaches (logistic regression with enet regularization, random forest, boosting, SVM, MLP, etc) plus a model stacking approach for predicting whether a patient's ICU stay will be longer than 2 days. You should use the `los_long` variable as the outcome. You algorithms can use patient demographic information (gender, age at ICU `intime`, marital status, race), ICU admission information (first care unit), the last lab measurements before the ICU stay, and first vital measurements during ICU stay as features. You are welcome to use any feature engineering techniques you think are appropriate; but make sure to not use features that are not available at an ICU stay's `intime`. For instance, `last_careunit` cannot be used in your algorithms. 
@@ -67,7 +70,8 @@ mimiciv_icu_cohort <- mimiciv_icu_cohort |> drop_na(los_long)
 # Identify columns with less than 1000 missing values
 valid_columns <- mimiciv_icu_cohort |> 
   summarise(across(everything(), ~ sum(is.na(.)))) |> 
-  pivot_longer(cols = everything(), names_to = "variable", values_to = "missing_count") |> 
+  pivot_longer(cols = everything(), names_to = "variable",
+               values_to = "missing_count") |> 
   filter(missing_count < 1000) |> 
   pull(variable)
 
@@ -109,8 +113,6 @@ test_data  |> count(los_long)
 
 3. Train and tune the models using the training set.
 ```{r}
-library(future)
-
 # Setup Parallel Processing using future
 plan(multisession, workers = parallel::detectCores() - 1)
 
@@ -132,7 +134,7 @@ rf_spec <- rand_forest(
   min_n = tune(),
   trees = 250
 ) %>%
-  set_engine("ranger") %>%
+  set_engine("ranger", importance = "permutation") %>% 
   set_mode("classification")
 
 rf_wf <- workflow() %>%
@@ -180,17 +182,17 @@ xgb_grid <- grid_random(
   size = 10  
 )
 
-# Verbose to see progress
-ctrl <- control_grid(verbose = TRUE)
+# Set up control settings for tuning
+ctrl_stack <- control_stack_grid() 
 
-# Tuning Each Model 
+# Tune Each Model with the updated control settings
 set.seed(203)
 log_res <- tune_grid(
   log_wf,
   resamples = folds,
   grid = log_grid,
   metrics = metric_set(roc_auc, accuracy),
-  control = ctrl
+  control = ctrl_stack 
 )
 
 set.seed(203)
@@ -199,7 +201,7 @@ rf_res <- tune_grid(
   resamples = folds,
   grid = rf_grid,
   metrics = metric_set(roc_auc, accuracy),
-  control = ctrl
+  control = ctrl_stack
 )
 
 set.seed(203)
@@ -208,18 +210,87 @@ xgb_res <- tune_grid(
   resamples = folds,
   grid = xgb_grid,
   metrics = metric_set(roc_auc, accuracy),
-  control = ctrl
+  control = ctrl_stack 
 )
 
 # Reset Parallel Processing
 plan(sequential) 
 
+# Create a model stack
+model_stack <- stacks() %>%
+  add_candidates(log_res) %>%
+  add_candidates(rf_res) %>%
+  add_candidates(xgb_res)
+
+# Fit the stacked model
+set.seed(203)
+model_stack <- model_stack %>%
+  blend_predictions() %>%
+  fit_members()
+
+# Save the stacked model for evaluation in Part 4
+final_stack_fit <- model_stack
 ```
 
 
 4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
 
 ```{r}
+# Function to evaluate a fitted model on the test set
+evaluate_model <- function(model_fit, test_data, model_name) {
+  # Generate predictions
+  pred_prob <- predict(model_fit, new_data = test_data, type = "prob")
+  pred_class <- predict(model_fit, new_data = test_data, type = "class")
+  
+  # Combine predictions with the true outcomes
+  preds <- bind_cols(test_data, pred_prob, pred_class)
+  
+  positive_class <- levels(test_data$los_long)[2]
+  prob_col <- paste0(".pred_", positive_class)
+  
+  # ROC AUC and Accuracy
+  roc_auc_metric <- roc_auc(preds, truth = los_long, !!sym(prob_col))
+  accuracy_metric <- accuracy(preds, truth = los_long, estimate = .pred_class)
+  
+  # All the metrics combined into one tibble with an added model name column
+  metrics <- bind_rows(roc_auc_metric, accuracy_metric) %>% 
+    mutate(Model = model_name)
+  
+  return(metrics)
+}
 
+# Fit final models using the best hyperparameters
+final_log_fit <- log_wf %>%
+  finalize_workflow(select_best(log_res, metric = "roc_auc")) %>%
+  fit(train_data)
+
+final_rf_fit <- rf_wf %>%
+  finalize_workflow(select_best(rf_res, metric = "roc_auc")) %>%
+  fit(train_data)
+
+final_xgb_fit <- xgb_wf %>%
+  finalize_workflow(select_best(xgb_res, metric = "roc_auc")) %>%
+  fit(train_data)
+
+# Evaluate each individual model on the test set
+log_metrics <- evaluate_model(final_log_fit, test_data, "Logistic Regression")
+rf_metrics  <- evaluate_model(final_rf_fit, test_data, "Random Forest")
+xgb_metrics <- evaluate_model(final_xgb_fit, test_data, "XGBoost")
+stack_metrics <- evaluate_model(final_stack_fit, test_data, "Stacked Model")
+
+# Combine all performance metrics into one results table
+all_metrics <- bind_rows(log_metrics, rf_metrics, xgb_metrics, stack_metrics)
+print(all_metrics)
+
+# Interpret the results and identify important features
+# Extract feature importance for the best model
+vip(final_rf_fit, num_features = 10)  # Visualize top 10 important features
+
+# Compare model performance and interpretability
+cat("Model Performance Comparison:\n")
+print(all_metrics)
+
+cat("\nFeature Importance for Random Forest:\n")
+vip(final_rf_fit, num_features = 10)
 ```
 
