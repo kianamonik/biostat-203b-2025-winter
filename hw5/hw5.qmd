@@ -29,66 +29,93 @@ library(doParallel)
 library(dials) 
 library(vip)
 library(future)
-library(stacks)
 library(tune)
+library(ROCR)
+library(missRanger)
+library(tidyverse)
+library(e1071)
+library(bonsai)
 ```
 
 Using the ICU cohort `mimiciv_icu_cohort.rds` you built in Homework 4, develop at least three machine learning approaches (logistic regression with enet regularization, random forest, boosting, SVM, MLP, etc) plus a model stacking approach for predicting whether a patient's ICU stay will be longer than 2 days. You should use the `los_long` variable as the outcome. You algorithms can use patient demographic information (gender, age at ICU `intime`, marital status, race), ICU admission information (first care unit), the last lab measurements before the ICU stay, and first vital measurements during ICU stay as features. You are welcome to use any feature engineering techniques you think are appropriate; but make sure to not use features that are not available at an ICU stay's `intime`. For instance, `last_careunit` cannot be used in your algorithms. 
 
 1. Data preprocessing and feature engineering.
 ```{r}
+# Load dataset
 mimiciv_icu_cohort <- read_rds("/Users/kiananik/Desktop/BIOSTAT/BIOSTAT 203B/203B-hw/hw4/mimiciv_shiny/mimic_icu_cohort.rds")
+
+# Create binary outcome variable
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
   mutate(los_long = as.factor(los > 2))
 
-# sort
-mimiciv_icu_cohort <- mimiciv_icu_cohort |>
+# Sort dataset
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
   arrange(subject_id, hadm_id, stay_id)
 
-# Selecting relevant features
-mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
-  select(
-    -subject_id, -hadm_id, -stay_id)
-mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
-  select(
-    los_long, 
-    gender, age_at_intime, marital_status, race, first_careunit,
-    non_invasive_blood_pressure_systolic, temperature_fahrenheit,
-    respiratory_rate, 
-    non_invasive_blood_pressure_diastolic, heart_rate,
-    bicarbonate, chloride, creatinine, glucose, potassium, sodium,
-    hematocrit, wbc
-  ) 
+# Drop variables with >5000 NAs to improve imputation
+missing_summary <- colSums(is.na(mimiciv_icu_cohort))
+valid_columns <- names(missing_summary[missing_summary < 7000])
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> select(all_of(valid_columns))
 
-# Converting categorical variables to factors
+# Select relevant features
+selected_features <- c(
+  "los_long", "gender", "age_at_intime", "race", "first_careunit",
+  "non_invasive_blood_pressure_systolic", "temperature_fahrenheit",
+  "respiratory_rate", "non_invasive_blood_pressure_diastolic", "heart_rate",
+  "admission_type", "admission_location", "insurance", "wbc", "hematocrit", 
+  "language", "admit_provider_id"
+)
+
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> select(all_of(selected_features))
+
+# Convert categorical variables to factors
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
-  mutate(across(c(gender, marital_status, race, first_careunit), as.factor))
+  mutate(across(where(is.character), as.factor))
+
+# Convert all integer columns to numeric
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
+  mutate(across(where(is.integer), as.numeric))
 
 # Ensure `los_long` has no missing values
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> drop_na(los_long)
 
-# Identify columns with less than 1000 missing values
-valid_columns <- mimiciv_icu_cohort |> 
-  summarise(across(everything(), ~ sum(is.na(.)))) |> 
-  pivot_longer(cols = everything(), names_to = "variable",
-               values_to = "missing_count") |> 
-  filter(missing_count < 1000) |> 
-  pull(variable)
+# Function to replace outliers with NA using IQR
+remove_outliers <- function(x) {
+  if (is.numeric(x)) {
+    qnt <- quantile(x, probs = c(0.25, 0.75), na.rm = TRUE)
+    IQR_value <- IQR(x, na.rm = TRUE)
+    x[x < (qnt[1] - 1.5 * IQR_value)] <- NA
+    x[x > (qnt[2] + 1.5 * IQR_value)] <- NA
+  }
+  return(x)
+}
 
-# Subset dataset to keep only valid columns
-mimiciv_icu_cohort <- mimiciv_icu_cohort |> select(all_of(valid_columns))
+# Apply outlier removal to numeric columns
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
+  mutate(across(where(is.numeric), remove_outliers))
 
-# Handling missing values
-preprocess_recipe <- recipe(los_long ~ ., data = mimiciv_icu_cohort) |>
-  step_impute_median(all_numeric_predictors()) |> 
-  step_impute_mode(all_nominal_predictors()) |>   
-  step_normalize(all_numeric_predictors()) |>   
-  step_dummy(all_nominal_predictors(), -all_outcomes())
+# Impute missing values using missRanger
+mimiciv_icu_cohort <- missRanger(
+  mimiciv_icu_cohort, 
+  num.trees = 100, 
+  maxiter = 5, 
+  verbose = 2
+)
 
-# Preparing the processed dataset
-prepped_data <- preprocess_recipe |> prep() |> juice()
+# Normalize numeric features
+mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
+  mutate(across(where(is.numeric), scale))
 
-glimpse(prepped_data)
+# Identify skewed variables
+numeric_features <- mimiciv_icu_cohort %>% select(where(is.numeric))
+skewed_vars <- apply(numeric_features, 2, function(x) skewness(x, na.rm = TRUE))
+
+# Apply log transformation to highly skewed features
+skewed_features <- names(skewed_vars[abs(skewed_vars) > 1])
+mimiciv_icu_cohort <- mimiciv_icu_cohort %>%
+  mutate(across(all_of(skewed_features), log1p))
+
+glimpse(mimiciv_icu_cohort)
 ```
 
 
@@ -97,7 +124,7 @@ glimpse(prepped_data)
 set.seed(203)
 
 data_split <- initial_split(
-  prepped_data, 
+  mimiciv_icu_cohort, 
   # stratify by los_long
   strata = "los_long", 
   prop = 0.5
@@ -105,15 +132,11 @@ data_split <- initial_split(
 
 train_data <- training(data_split)
 test_data  <- testing(data_split)
-
-# Check class distribution
-train_data |> count(los_long)
-test_data  |> count(los_long)
 ```
 
 3. Train and tune the models using the training set.
 ```{r}
-# Setup Parallel Processing using future
+# Setup Parallel Processing
 plan(multisession, workers = parallel::detectCores() - 1)
 
 # Logistic Regression with Elastic Net Regularization
@@ -132,7 +155,7 @@ log_wf <- workflow() %>%
 rf_spec <- rand_forest(
   mtry = tune(),
   min_n = tune(),
-  trees = 250
+  trees = 1000 
 ) %>%
   set_engine("ranger", importance = "permutation") %>% 
   set_mode("classification")
@@ -143,7 +166,7 @@ rf_wf <- workflow() %>%
 
 # Boosted Trees (XGBoost)
 xgb_spec <- boost_tree(
-  trees = tune(),
+  trees = 1000, 
   tree_depth = tune(),
   learn_rate = tune(),
   loss_reduction = tune(),
@@ -157,109 +180,65 @@ xgb_wf <- workflow() %>%
   add_model(xgb_spec) %>%
   add_formula(los_long ~ .) 
 
+lightgbm_spec <- boost_tree(
+  trees = 1000,
+  tree_depth = tune(),
+  learn_rate = tune(),
+  loss_reduction = tune(),
+  sample_size = tune(),
+  min_n = tune()
+) %>%
+  set_engine("lightgbm") %>%
+  set_mode("classification")
+
+lightgbm_wf <- workflow() %>%
+  add_model(lightgbm_spec) %>%
+  add_formula(los_long ~ .) 
+
 # Cross-validation Setup 
 set.seed(203)
-folds <- vfold_cv(train_data, v = 3, strata = los_long)  
+folds <- vfold_cv(train_data, v = 10, strata = los_long)  
 
-# Tuning Grids 
-
-# Logistic Regression Grid 
-log_grid <- grid_regular(
-  penalty(range = c(0.0001, 1)),
-  mixture(range = c(0, 1)),
-  levels = 3 
-)
-
-# Random Forest Grid
-rf_grid <- grid_random(
-  finalize(extract_parameter_set_dials(rf_spec), train_data), 
-  size = 5  
-)
-
-# XGBoost Grid
-xgb_grid <- grid_random(
-  extract_parameter_set_dials(xgb_spec),  
-  size = 10  
-)
-
-# Set up control settings for tuning
-ctrl_stack <- control_stack_grid() 
-
-# Tune Each Model with the updated control settings
+# Tune Each Model with Racing
 set.seed(203)
-log_res <- tune_grid(
+log_res <- tune_race_anova(
   log_wf,
   resamples = folds,
-  grid = log_grid,
+  param_info = extract_parameter_set_dials(log_spec), 
   metrics = metric_set(roc_auc, accuracy),
-  control = ctrl_stack 
+  control = control_race(verbose_elim = TRUE)
 )
 
 set.seed(203)
-rf_res <- tune_grid(
+rf_res <- tune_race_anova(
   rf_wf,
   resamples = folds,
-  grid = rf_grid,
+  param_info = extract_parameter_set_dials(rf_spec), 
   metrics = metric_set(roc_auc, accuracy),
-  control = ctrl_stack
+  control = control_race(verbose_elim = TRUE)
 )
 
 set.seed(203)
-xgb_res <- tune_grid(
+xgb_res <- tune_race_anova(
   xgb_wf,
   resamples = folds,
-  grid = xgb_grid,
+  param_info = extract_parameter_set_dials(xgb_spec), 
   metrics = metric_set(roc_auc, accuracy),
-  control = ctrl_stack 
+  control = control_race(verbose_elim = TRUE)
 )
 
-# Reset Parallel Processing
+lightgbm_res <- tune_race_anova(
+  lightgbm_wf,
+  resamples = folds,
+  param_info = extract_parameter_set_dials(lightgbm_spec), 
+  metrics = metric_set(roc_auc, accuracy),
+  control = control_race(verbose_elim = TRUE)
+)
+
 plan(sequential) 
 
-# Create a model stack
-model_stack <- stacks() %>%
-  add_candidates(log_res) %>%
-  add_candidates(rf_res) %>%
-  add_candidates(xgb_res)
 
-# Fit the stacked model
-set.seed(203)
-model_stack <- model_stack %>%
-  blend_predictions() %>%
-  fit_members()
-
-# Save the stacked model for evaluation in Part 4
-final_stack_fit <- model_stack
-```
-
-
-4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
-
-```{r}
-# Function to evaluate a fitted model on the test set
-evaluate_model <- function(model_fit, test_data, model_name) {
-  # Generate predictions
-  pred_prob <- predict(model_fit, new_data = test_data, type = "prob")
-  pred_class <- predict(model_fit, new_data = test_data, type = "class")
-  
-  # Combine predictions with the true outcomes
-  preds <- bind_cols(test_data, pred_prob, pred_class)
-  
-  positive_class <- levels(test_data$los_long)[2]
-  prob_col <- paste0(".pred_", positive_class)
-  
-  # ROC AUC and Accuracy
-  roc_auc_metric <- roc_auc(preds, truth = los_long, !!sym(prob_col))
-  accuracy_metric <- accuracy(preds, truth = los_long, estimate = .pred_class)
-  
-  # All the metrics combined into one tibble with an added model name column
-  metrics <- bind_rows(roc_auc_metric, accuracy_metric) %>% 
-    mutate(Model = model_name)
-  
-  return(metrics)
-}
-
-# Fit final models using the best hyperparameters
+# Stacking the Models
 final_log_fit <- log_wf %>%
   finalize_workflow(select_best(log_res, metric = "roc_auc")) %>%
   fit(train_data)
@@ -272,25 +251,125 @@ final_xgb_fit <- xgb_wf %>%
   finalize_workflow(select_best(xgb_res, metric = "roc_auc")) %>%
   fit(train_data)
 
-# Evaluate each individual model on the test set
-log_metrics <- evaluate_model(final_log_fit, test_data, "Logistic Regression")
-rf_metrics  <- evaluate_model(final_rf_fit, test_data, "Random Forest")
-xgb_metrics <- evaluate_model(final_xgb_fit, test_data, "XGBoost")
-stack_metrics <- evaluate_model(final_stack_fit, test_data, "Stacked Model")
+# Feature Importance for LightGBM
+final_lightgbm_fit <- lightgbm_wf %>%
+  finalize_workflow(select_best(lightgbm_res, metric = "roc_auc")) %>%
+  fit(train_data)
 
-# Combine all performance metrics into one results table
-all_metrics <- bind_rows(log_metrics, rf_metrics, xgb_metrics, stack_metrics)
-print(all_metrics)
+vip(extract_fit_engine(final_lightgbm_fit), num_features = 10)
 
-# Interpret the results and identify important features
-# Extract feature importance for the best model
-vip(final_rf_fit, num_features = 10)  # Visualize top 10 important features
+positive_class <- levels(train_data$los_long)[2]
+prob_col <- paste0(".pred_", positive_class)
 
-# Compare model performance and interpretability
-cat("Model Performance Comparison:\n")
-print(all_metrics)
+train_preds <- train_data %>%
+  bind_cols(
+    predict(final_log_fit, new_data = train_data, type = "prob") %>%
+      rename(log_pred = !!sym(prob_col)),
+    predict(final_rf_fit, new_data = train_data, type = "prob") %>% 
+      rename(rf_pred = !!sym(prob_col)),
+    predict(final_xgb_fit, new_data = train_data, type = "prob") %>%
+      rename(xgb_pred = !!sym(prob_col)),
+    predict(final_lightgbm_fit, new_data = train_data, type = "prob") %>%
+      rename(lightgbm_pred = !!sym(prob_col))
+  ) %>%
+  select(los_long, log_pred, rf_pred, xgb_pred, lightgbm_pred)
 
-cat("\nFeature Importance for Random Forest:\n")
-vip(final_rf_fit, num_features = 10)
+stacking_spec <- logistic_reg(penalty = 0.01, mixture = 0.5) %>% 
+  set_engine("glmnet") %>%
+  set_mode("classification")
+
+stacking_wf <- workflow() %>%
+  add_model(stacking_spec) %>%
+  add_formula(los_long ~ log_pred + rf_pred + xgb_pred + lightgbm_pred)
+
+stacking_fit <- stacking_wf %>% fit(train_preds)
 ```
 
+
+4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
+
+```{r}
+# Function to evaluate a fitted model on the test set
+evaluate_model <- function(model_fit, test_data, model_name) {
+  pred_prob <- predict(model_fit, new_data = test_data, type = "prob")
+  pred_class <- predict(model_fit, new_data = test_data, type = "class")
+  
+  preds <- bind_cols(test_data, pred_prob, pred_class)
+  
+  positive_class <- levels(test_data$los_long)[2]
+  prob_col <- paste0(".pred_", positive_class)
+  
+  roc_auc_metric <- roc_auc(preds, truth = los_long, !!sym(prob_col))
+  accuracy_metric <- accuracy(preds, truth = los_long, estimate = .pred_class)
+  
+  metrics <- bind_rows(roc_auc_metric, accuracy_metric) %>% 
+    mutate(Model = model_name)
+  
+  return(metrics)
+}
+
+# Evaluate Models
+log_metrics <- evaluate_model(final_log_fit, test_data, "Logistic Regression")
+rf_metrics <- evaluate_model(final_rf_fit, test_data, "Random Forest")
+xgb_metrics <- evaluate_model(final_xgb_fit, test_data, "XGBoost")
+lightgbm_metrics <- evaluate_model(final_lightgbm_fit, test_data, "LightGBM")
+
+# Generate test set predictions from base models
+test_preds <- test_data %>%
+  bind_cols(
+    predict(final_log_fit, new_data = test_data, type = "prob") %>%
+      rename(log_pred = !!sym(prob_col)),
+    predict(final_rf_fit, new_data = test_data, type = "prob") %>%
+      rename(rf_pred = !!sym(prob_col)),
+    predict(final_xgb_fit, new_data = test_data, type = "prob") %>% 
+      rename(xgb_pred = !!sym(prob_col)),
+    predict(final_lightgbm_fit, new_data = test_data, type = "prob") %>%
+      rename(lightgbm_pred = !!sym(prob_col))
+  ) %>%
+  select(los_long, log_pred, rf_pred, xgb_pred, lightgbm_pred)
+
+# Make predictions using the stacked model
+stacked_test_preds <- predict(stacking_fit, new_data = test_preds,
+                              type = "prob")
+
+# Identify the correct probability column 
+stacked_prob_col <- 
+  colnames(stacked_test_preds)[str_detect(colnames(stacked_test_preds),
+                                          "^.pred_")][1]
+
+# Add the true labels to the stacked predictions
+stacked_test_preds <- bind_cols(test_preds %>% 
+                                  select(los_long), stacked_test_preds)
+
+# Rename the probability column for clarity
+stacked_test_preds <- stacked_test_preds %>%
+  rename(.pred_prob = !!sym(stacked_prob_col))
+
+# Add predicted class labels
+stacked_test_preds$.pred_class <- ifelse(stacked_test_preds$.pred_prob > 0.5,
+                                         "TRUE", "FALSE")
+stacked_test_preds$.pred_class <- as.factor(stacked_test_preds$.pred_class)
+
+# Evaluate the stacked model
+stack_metrics <- bind_rows(
+  roc_auc(stacked_test_preds, truth = los_long, .pred_prob) %>% 
+    mutate(Model = "Stacked Model"),
+  accuracy(stacked_test_preds, truth = los_long, estimate = .pred_class) %>% 
+    mutate(Model = "Stacked Model")
+)
+
+# Print the stacked model metrics
+print(stack_metrics)
+
+# Combine all results
+all_metrics <- bind_rows(log_metrics, rf_metrics, xgb_metrics, stack_metrics,
+                         lightgbm_metrics)
+
+# Interpret the results and identify important features
+cat("\nFeature Importance for Random Forest:\n")
+vip(extract_fit_engine(final_rf_fit), num_features = 10)
+
+cat("\nModel Performance Comparison:\n")
+print(all_metrics)
+```
+The performance metrics show that the stacked model has the highest ROC AUC (0.611) among all models, but its accuracy (0.422) is lower than the base models. This suggests that the stacked model is better at ranking predictions (higher ROC AUC) but struggles with classification accuracy. The base models (Logistic Regression, Random Forest, XGBoost, LightGBM) have lower ROC AUC values but higher accuracy, indicating they are better at predicting the majority class.
