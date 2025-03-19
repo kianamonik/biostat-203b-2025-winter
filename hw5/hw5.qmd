@@ -11,10 +11,10 @@ format:
     toc-depth: 4
     toc-location: left
     code-fold: false
-    pdf:
-      number-sections: true
-      toc: true
-      toc-depth: 3
+  pdf:
+    number-sections: true
+    toc: true
+    toc-depth: 3
 ---
 
 ## Predicting ICU duration
@@ -35,6 +35,8 @@ library(missRanger)
 library(tidyverse)
 library(e1071)
 library(bonsai)
+library(kernlab)
+library(pROC)
 ```
 
 Using the ICU cohort `mimiciv_icu_cohort.rds` you built in Homework 4, develop at least three machine learning approaches (logistic regression with enet regularization, random forest, boosting, SVM, MLP, etc) plus a model stacking approach for predicting whether a patient's ICU stay will be longer than 2 days. You should use the `los_long` variable as the outcome. You algorithms can use patient demographic information (gender, age at ICU `intime`, marital status, race), ICU admission information (first care unit), the last lab measurements before the ICU stay, and first vital measurements during ICU stay as features. You are welcome to use any feature engineering techniques you think are appropriate; but make sure to not use features that are not available at an ICU stay's `intime`. For instance, `last_careunit` cannot be used in your algorithms. 
@@ -42,7 +44,7 @@ Using the ICU cohort `mimiciv_icu_cohort.rds` you built in Homework 4, develop a
 1. Data preprocessing and feature engineering.
 ```{r}
 # Load dataset
-mimiciv_icu_cohort <- read_rds("/Users/kiananik/Desktop/BIOSTAT/BIOSTAT 203B/203B-hw/hw4/mimiciv_shiny/mimic_icu_cohort.rds")
+mimiciv_icu_cohort <- read_rds("mimic_icu_cohort.rds")
 
 # Create binary outcome variable
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
@@ -52,7 +54,7 @@ mimiciv_icu_cohort <- mimiciv_icu_cohort |>
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> 
   arrange(subject_id, hadm_id, stay_id)
 
-# Drop variables with >5000 NAs to improve imputation
+# Drop variables with >7000 NAs to improve imputation
 missing_summary <- colSums(is.na(mimiciv_icu_cohort))
 valid_columns <- names(missing_summary[missing_summary < 7000])
 mimiciv_icu_cohort <- mimiciv_icu_cohort |> select(all_of(valid_columns))
@@ -155,7 +157,7 @@ log_wf <- workflow() %>%
 rf_spec <- rand_forest(
   mtry = tune(),
   min_n = tune(),
-  trees = 1000 
+  trees = 500 
 ) %>%
   set_engine("ranger", importance = "permutation") %>% 
   set_mode("classification")
@@ -166,7 +168,7 @@ rf_wf <- workflow() %>%
 
 # Boosted Trees (XGBoost)
 xgb_spec <- boost_tree(
-  trees = 1000, 
+  trees = 500, 
   tree_depth = tune(),
   learn_rate = tune(),
   loss_reduction = tune(),
@@ -372,4 +374,4 @@ vip(extract_fit_engine(final_rf_fit), num_features = 10)
 cat("\nModel Performance Comparison:\n")
 print(all_metrics)
 ```
-The performance metrics show that the stacked model has the highest ROC AUC (0.611) among all models, but its accuracy (0.422) is lower than the base models. This suggests that the stacked model is better at ranking predictions (higher ROC AUC) but struggles with classification accuracy. The base models (Logistic Regression, Random Forest, XGBoost, LightGBM) have lower ROC AUC values but higher accuracy, indicating they are better at predicting the majority class.
+The performance metrics show that the stacked model has the highest ROC AUC (0.611) among all models, but its accuracy (0.422) is lower than the base models. This suggests that the stacked model is better at ranking predictions (higher ROC AUC) but struggles with classification accuracy.
